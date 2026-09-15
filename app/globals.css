@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+/*
+ * DTM brand tokens, matched to the approved Claude Design mockup
+ * ("DTM Partner Portal.dc.html") rather than the brief's abstract token
+ * list where the two differ — the mockup is the actual approved look.
+ * Brand-locked dark app, not light/dark-adaptive.
+ */
+:root {
+  --dtm-ink: #0a0a0d;
+  --dtm-ink-2: #0c0c11;
+  --dtm-surface: #101015;
+  --dtm-surface-2: #17171d;
+  --dtm-hairline: #1d1d24;
+  --dtm-hairline-2: #33333e;
+
+  --accent: #d4367a;
+  --accent-wash: rgb(212 54 122 / 9%);
+  --violet-400: #7c3aed;
+  --fg-accent: #d4367a;
+  --cyan: #21e7f0;
+
+  --ok: #4fa97a;
+  --warn: #e0a33e;
+  --alert: #e86b6b;
+  --alert-wash: rgb(232 107 107 / 10%);
+
+  --fg-1: #ededf0;
+  --fg-2: #c2c2cc;
+  --fg-3: #a6a6b2;
+  --fg-4: #8a8a98;
+  --fg-5: #6c6c7a;
+}
+
+@theme inline {
+  --color-dtm-ink: var(--dtm-ink);
+  --color-dtm-ink-2: var(--dtm-ink-2);
+  --color-dtm-surface: var(--dtm-surface);
+  --color-dtm-surface-2: var(--dtm-surface-2);
+  --color-dtm-hairline: var(--dtm-hairline);
+  --color-dtm-hairline-2: var(--dtm-hairline-2);
+
+  --color-accent: var(--accent);
+  --color-violet-400: var(--violet-400);
+  --color-fg-accent: var(--fg-accent);
+  --color-cyan: var(--cyan);
+
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-alert: var(--alert);
+
+  --color-fg-1: var(--fg-1);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-fg-4: var(--fg-4);
+  --color-fg-5: var(--fg-5);
+
+  --font-sans: var(--font-onest);
+  --font-mono: var(--font-fragment-mono);
+
+  --radius-card: 12px;
+  --radius-panel: 9px;
+  --radius-chip: 6px;
+  --radius-tag: 999px;
+}
+
+body {
+  background: var(--dtm-ink);
+  color: var(--fg-2);
+  font-family: var(--font-onest), sans-serif;
+  font-size: 14px;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--fg-1);
+  font-weight: 600;
+}
+
+.eyebrow {
+  font-family: var(--font-fragment-mono), monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 10px;
+  color: var(--fg-5);
+}
+
+table {
+  font-family: var(--font-fragment-mono), monospace;
+}
+
+a {
+  color: var(--fg-accent);
+}
+a:hover {
+  color: #e4497f;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--dtm-surface-2);
+  border-radius: 8px;
+}

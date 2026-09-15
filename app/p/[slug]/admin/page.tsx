@@ -1,0 +1,133 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { getPortalBySlug } from "@/lib/data";
+import { getMediaKit, mediaKitEventSlug, type MediaKitEvent } from "@/lib/portal-content";
+import { getEmailDerivedContact } from "@/lib/brand-assets";
+import { getPortalCode } from "@/lib/portal-code";
+import { updatePartnerMediaKit } from "./actions";
+import ImageDropField from "../ImageDropField";
+import SaveMediaKitButton from "./SaveMediaKitButton";
+
+export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/admin">) {
+  const session = await auth();
+  if (!session) redirect("/sign-in");
+
+  const { slug } = await params;
+  const portal = await getPortalBySlug(slug);
+  if (!portal) notFound();
+
+  const code = getPortalCode(slug);
+  const mediaKit = await getMediaKit(slug);
+  const emailContact = portal.poc ? null : await getEmailDerivedContact(slug);
+  const mediaKitEvents = portal.events.filter(
+    (e): e is MediaKitEvent => e === "DTM27" || e === "SPARTA 2027",
+  );
+
+  return (
+    <main className="mx-auto max-w-3xl space-y-6 px-6 py-10">
+      <div>
+        <Link href="/portals" className="text-sm">
+          ← All portals
+        </Link>
+        <h1 className="mt-2 text-2xl text-fg-1">{portal.companyName} — admin</h1>
+        <Link href={`/p/${slug}`} className="text-sm">
+          View the partner-facing portal ↗
+        </Link>
+      </div>
+
+      <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6">
+        <p className="eyebrow mb-2">Partner access code</p>
+        <p className="mb-2 font-mono text-2xl" style={{ color: "var(--accent)" }}>
+          {code}
+        </p>
+        <p className="text-sm text-fg-4">
+          Send this to the partner&apos;s point of contact — entering it at{" "}
+          <code>/p/{slug}</code> unlocks their portal with no account needed. It never expires
+          or rotates unless <code>PORTAL_CODE_SECRET</code> changes.
+        </p>
+      </div>
+
+      <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6">
+        <p className="eyebrow mb-2">Partner&apos;s point of contact</p>
+        {portal.poc ? (
+          <div className="flex flex-col gap-0.5">
+            <p className="text-[15px] text-fg-1">{portal.poc.name}</p>
+            {portal.poc.jobTitle && <p className="text-sm text-fg-4">{portal.poc.jobTitle}</p>}
+            {portal.poc.email && (
+              <a href={`mailto:${portal.poc.email}`} className="text-sm">
+                {portal.poc.email}
+              </a>
+            )}
+          </div>
+        ) : emailContact ? (
+          <div className="flex flex-col gap-0.5">
+            <p className="text-[15px] text-fg-1">{emailContact.name ?? emailContact.email}</p>
+            <a href={`mailto:${emailContact.email}`} className="text-sm">
+              {emailContact.email}
+            </a>
+            <p className="mt-1 text-xs text-fg-5">
+              Picked up automatically from an email — not set on Attio&apos;s CS Tracker entry.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-fg-4">
+            No PoC set on the CS Tracker entry yet — set the &quot;PoC&quot; field on this
+            company&apos;s CS Tracker entry in Attio.
+          </p>
+        )}
+      </div>
+
+      {mediaKitEvents.map((event) => {
+        const kit = mediaKit[event];
+        const updateAction = updatePartnerMediaKit.bind(null, slug, event);
+        return (
+          <div
+            key={event}
+            className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6"
+          >
+            <p className="eyebrow mb-5">
+              {event} media kit for {portal.companyName}
+            </p>
+            <form action={updateAction}>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div>
+                  <p className="eyebrow mb-2">LinkedIn-ready image</p>
+                  <ImageDropField
+                    name="image"
+                    removeFieldName="removeImage"
+                    hasExistingImage={kit.hasImage}
+                    imageSrc={`/api/media-kit/${slug}/${mediaKitEventSlug(event)}`}
+                  />
+                </div>
+                <div>
+                  <p className="eyebrow mb-2">Ready-to-post copy</p>
+                  <textarea
+                    name="copy"
+                    defaultValue={kit.copy ?? ""}
+                    placeholder="Copy this partner can paste straight into a LinkedIn post…"
+                    rows={9}
+                    className="w-full rounded-[10px] border px-3 py-2 text-fg-1 placeholder:text-fg-5"
+                    style={{ background: "var(--dtm-ink-2)", borderColor: "var(--dtm-hairline-2)" }}
+                  />
+                </div>
+              </div>
+              <SaveMediaKitButton>
+                Save {event} media kit for {portal.companyName}
+              </SaveMediaKitButton>
+            </form>
+          </div>
+        );
+      })}
+
+      {portal.internalNotes && (
+        <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6">
+          <p className="eyebrow mb-2">Internal notes (staff only)</p>
+          <p className="whitespace-pre-wrap text-sm text-fg-3 leading-[1.55]">
+            {portal.internalNotes}
+          </p>
+        </div>
+      )}
+    </main>
+  );
+}
