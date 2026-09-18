@@ -478,34 +478,34 @@ export default function PortalShell({
                         background: `radial-gradient(140% 90% at 0% 0%, color-mix(in srgb, ${section.accentVar} 16%, var(--dtm-surface)) 0%, var(--dtm-surface) 55%)`,
                       }}
                     >
-                      <div className="p-[18px_22px_0]">
+                      <div className="flex items-start justify-between gap-3 p-[18px_22px_0]">
                         <div
                           className="text-[16px] font-semibold"
                           style={{ color: section.accentVar }}
                         >
                           {section.eventLabel}
                         </div>
+                        {section.daysAway !== null && (
+                          <div className="text-right shrink-0">
+                            <div
+                              className="text-[28px] font-semibold leading-[1.1] tracking-[-0.03em]"
+                              style={{ color: section.accentVar }}
+                            >
+                              {section.daysAway}
+                            </div>
+                            <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-4">
+                              Days away
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex flex-col gap-2 px-[22px] pt-2 pb-[18px] text-[13px] text-fg-2">
+                      <div
+                        className="flex flex-col gap-2 px-[22px] pt-2 pb-[18px] text-[13px] text-fg-2"
+                        style={{ borderBottom: "1px solid var(--dtm-hairline)" }}
+                      >
                         <div>{section.dateLine}</div>
                         <div>{section.location}</div>
                       </div>
-                      {section.daysAway !== null && (
-                        <div
-                          className="px-[22px] pb-[18px]"
-                          style={{ borderBottom: "1px solid var(--dtm-hairline)" }}
-                        >
-                          <div
-                            className="text-[36px] font-semibold leading-[1.1] tracking-[-0.03em]"
-                            style={{ color: section.accentVar }}
-                          >
-                            {section.daysAway}
-                          </div>
-                          <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-4">
-                            Days away
-                          </div>
-                        </div>
-                      )}
                       {section.context && (
                         <div
                           className="px-[22px] py-[16px] text-[13px] text-fg-3 leading-[1.6]"
@@ -547,7 +547,12 @@ export default function PortalShell({
                     className="grid gap-[18px] items-start"
                     style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}
                   >
-                    <Card>
+                    <Card
+                      style={{
+                        border: "1px solid color-mix(in srgb, var(--ok) 35%, transparent)",
+                        background: "radial-gradient(140% 90% at 0% 0%, color-mix(in srgb, var(--ok) 12%, var(--dtm-surface)) 0%, var(--dtm-surface) 55%)",
+                      }}
+                    >
                       <div className="flex justify-between items-start gap-2.5">
                         <div className="text-[15px] font-semibold text-fg-1">
                           Become a Guardian Catalyst Partner
