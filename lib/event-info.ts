@@ -55,7 +55,6 @@ export const EVENT_INFO: Partial<
     dates: "11 February 2027",
     location: "Deutsches Jagd- und Fischereimuseum, Neuhauser Str. 2, 80331 Munich",
     startDate: "2027-02-11",
-    context: "Official side event of the Munich Security Conference, co-organised with TUM Venture Labs.",
     website: "https://www.deeptech.build/sparta",
     hasFloorPlan: true,
   },
