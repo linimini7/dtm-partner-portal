@@ -469,41 +469,52 @@ export default function PortalShell({
                   {view.eventSections.map((section) => (
                     <div
                       key={section.event}
-                      className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface overflow-hidden flex flex-col"
-                      style={{ borderLeft: `3px solid ${section.accentVar}` }}
+                      className="rounded-[var(--radius-card)] border overflow-hidden flex flex-col"
+                      style={{
+                        borderLeft: `3px solid ${section.accentVar}`,
+                        borderTop: `1px solid color-mix(in srgb, ${section.accentVar} 30%, var(--dtm-hairline))`,
+                        borderRight: `1px solid var(--dtm-hairline)`,
+                        borderBottom: `1px solid var(--dtm-hairline)`,
+                        background: `radial-gradient(140% 90% at 0% 0%, color-mix(in srgb, ${section.accentVar} 16%, var(--dtm-surface)) 0%, var(--dtm-surface) 55%)`,
+                      }}
                     >
-                      <div className="flex items-center justify-between gap-3 p-[18px_22px]">
+                      <div className="p-[18px_22px_0]">
                         <div
                           className="text-[16px] font-semibold"
                           style={{ color: section.accentVar }}
                         >
                           {section.eventLabel}
                         </div>
-                        {section.daysAway !== null && (
-                          <div
-                            className="text-[13px] font-semibold"
-                            style={{ color: section.accentVar }}
-                          >
-                            {section.daysAway} days away
-                          </div>
-                        )}
                       </div>
-                      <div className="flex flex-col gap-2 px-[22px] pb-[18px] text-[13px] text-fg-2">
+                      <div className="flex flex-col gap-2 px-[22px] pt-2 pb-[18px] text-[13px] text-fg-2">
                         <div>{section.dateLine}</div>
                         <div>{section.location}</div>
                       </div>
+                      {section.daysAway !== null && (
+                        <div
+                          className="px-[22px] pb-[18px]"
+                          style={{ borderBottom: "1px solid var(--dtm-hairline)" }}
+                        >
+                          <div
+                            className="text-[36px] font-semibold leading-[1.1] tracking-[-0.03em]"
+                            style={{ color: section.accentVar }}
+                          >
+                            {section.daysAway}
+                          </div>
+                          <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-4">
+                            Days away
+                          </div>
+                        </div>
+                      )}
                       {section.context && (
                         <div
                           className="px-[22px] py-[16px] text-[13px] text-fg-3 leading-[1.6]"
-                          style={{ borderTop: "1px solid var(--dtm-hairline)" }}
+                          style={{ borderBottom: "1px solid var(--dtm-hairline)" }}
                         >
                           {section.context}
                         </div>
                       )}
-                      <div
-                        className="px-[22px] py-[16px] flex flex-col gap-1"
-                        style={{ borderTop: "1px solid var(--dtm-hairline)" }}
-                      >
+                      <div className="px-[22px] py-[16px] flex flex-col gap-1" style={{ borderBottom: "1px solid var(--dtm-hairline)" }}>
                         <div className="eyebrow mb-1">What you get</div>
                         {section.glanceRows.length === 0 ? (
                           <div className="text-[12.5px] text-fg-4">
@@ -513,10 +524,7 @@ export default function PortalShell({
                           section.glanceRows.map((row) => <KV key={row.label} {...row} />)
                         )}
                       </div>
-                      <div
-                        className="px-[22px] py-[16px] flex flex-col gap-1"
-                        style={{ borderTop: "1px solid var(--dtm-hairline)" }}
-                      >
+                      <div className="px-[22px] py-[16px] flex flex-col gap-1">
                         <div className="eyebrow mb-1">Practical</div>
                         {section.practicalLinks.map((row, j) => (
                           <KV key={row.label + j} {...row} />
