@@ -5,7 +5,9 @@ import { getPortalBySlug } from "@/lib/data";
 import { getMediaKit, mediaKitEventSlug, type MediaKitEvent } from "@/lib/portal-content";
 import { getEmailDerivedContact } from "@/lib/brand-assets";
 import { getPortalCode } from "@/lib/portal-code";
-import { updatePartnerMediaKit } from "./actions";
+import { getTicketCodes } from "@/lib/ticket-codes";
+import { buildPortalView } from "@/lib/portal-view";
+import { updatePartnerMediaKit, updateTicketCodes } from "./actions";
 import ImageDropField from "../ImageDropField";
 import SaveMediaKitButton from "./SaveMediaKitButton";
 
@@ -23,6 +25,10 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
   const mediaKitEvents = portal.events.filter(
     (e): e is MediaKitEvent => e === "DTM27" || e === "SPARTA 2027",
   );
+  const view = buildPortalView(portal);
+  const ticketCodes = await getTicketCodes(slug);
+  const ticketDeliverableIds = view.ticketItems.map((d) => d.id);
+  const updateTicketCodesAction = updateTicketCodes.bind(null, slug, ticketDeliverableIds);
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 px-6 py-10">
@@ -45,6 +51,42 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
           Send this to the partner&apos;s point of contact — entering it at{" "}
           <code>/p/{slug}</code> unlocks their portal with no account needed. It never expires
           or rotates unless <code>PORTAL_CODE_SECRET</code> changes.
+        </p>
+      </div>
+
+      <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6">
+        <p className="eyebrow mb-2">Ticket redemption codes</p>
+        {view.ticketItems.length === 0 ? (
+          <p className="text-sm text-fg-4">No ticket deliverables recorded for this partner yet.</p>
+        ) : (
+          <form action={updateTicketCodesAction} className="flex flex-col gap-4">
+            {view.ticketItems.map((d) => (
+              <label key={d.id} className="block text-sm">
+                <span className="mb-1 block text-fg-3">
+                  {d.name}
+                  {d.quantity && d.quantity > 1 ? ` (× ${d.quantity})` : ""}
+                </span>
+                <input
+                  type="text"
+                  name={`code_${d.id}`}
+                  defaultValue={ticketCodes[d.id] ?? ""}
+                  placeholder="e.g. DTM27-VUSE-XR"
+                  className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 font-mono text-fg-1"
+                />
+              </label>
+            ))}
+            <button
+              type="submit"
+              className="self-start rounded-[8px] px-4 py-2 text-sm font-medium"
+              style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
+            >
+              Save redemption codes
+            </button>
+          </form>
+        )}
+        <p className="mt-3 text-xs text-fg-5">
+          Each ticket type gets its own code — the partner sees it under &quot;Redeem your
+          included tickets.&quot;
         </p>
       </div>
 

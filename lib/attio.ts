@@ -1,4 +1,5 @@
 import { CURRENT_CYCLE_EVENTS } from "@/lib/event-info";
+import { derivePartnerObligations } from "@/lib/portal-view";
 import { slugify } from "@/lib/slug";
 import type {
   Deliverable,
@@ -37,6 +38,7 @@ const COMPANIES_OBJECT = process.env.ATTIO_COMPANIES_OBJECT_ID ?? "companies";
 const PEOPLE_OBJECT = process.env.ATTIO_PEOPLE_OBJECT_ID ?? "people";
 const DELIVERABLES_OBJECT =
   process.env.ATTIO_DELIVERABLES_OBJECT_ID ?? "deliverables";
+const INVENTORY_OBJECT = process.env.ATTIO_INVENTORY_OBJECT_ID ?? "inventory";
 const CS_TRACKER_LIST =
   process.env.ATTIO_CS_TRACKER_LIST_ID ?? "customer_success";
 
@@ -238,11 +240,51 @@ function csEntryToSummary(
     deliverablesTotal: 0,
     overdueCount: 0,
     nextDeadline: null,
+    // Filled in by the caller once deliverables are fetched, same as the
+    // rollup counts above — derivePartnerObligations needs the real
+    // per-company deliverables list to know which named-attendee seats apply.
+    partnerObligations: [],
   };
 }
 
+/**
+ * A company can end up with more than one CS Tracker entry — Attio's own
+ * native workflow (fires when a sales-pipeline deal crosses into its
+ * closed-won-equivalent stage) and the "Contract → Attio Deliverables" n8n
+ * pipeline (fires when a signed contract PDF lands in Drive) each create
+ * entries independently, with no check for one already existing. Confirmed
+ * live for Bayern Innovativ and Sphere Defense (2026-09-17): a real,
+ * contract-backed entry from one path, then a bare duplicate from the
+ * other ~a day (or, that day, ~2 minutes) later. Every caller of
+ * listCsEntries() wants exactly one entry per company — a partner should
+ * never get two rows in the staff table or an arbitrary pick of which
+ * entry's data renders their portal — so dedupe here, once, for everyone.
+ * Prefer whichever entry actually has a contract on file; between two
+ * with (or without) one, prefer the earliest, since the later one is the
+ * stray duplicate in every case seen so far.
+ */
 async function listCsEntries(): Promise<AttioListEntry[]> {
-  return queryListEntries(CS_TRACKER_LIST, {});
+  const entries = await queryListEntries(CS_TRACKER_LIST, {});
+  const byCompany = new Map<string, AttioListEntry>();
+  for (const entry of entries) {
+    const existing = byCompany.get(entry.parent_record_id);
+    if (!existing) {
+      byCompany.set(entry.parent_record_id, entry);
+      continue;
+    }
+    const existingHasContract = Boolean(firstText(existing.entry_values, "contract_link"));
+    const candidateHasContract = Boolean(firstText(entry.entry_values, "contract_link"));
+    if (candidateHasContract === existingHasContract) {
+      const existingCreated = firstText(existing.entry_values, "created_at");
+      const candidateCreated = firstText(entry.entry_values, "created_at");
+      if (candidateCreated && existingCreated && new Date(candidateCreated) < new Date(existingCreated)) {
+        byCompany.set(entry.parent_record_id, entry);
+      }
+    } else if (candidateHasContract) {
+      byCompany.set(entry.parent_record_id, entry);
+    }
+  }
+  return Array.from(byCompany.values());
 }
 
 // ---- Public API -------------------------------------------------------------
@@ -289,12 +331,14 @@ export async function listPortalCompanies(): Promise<PortalSummary[]> {
       const today = new Date().toISOString().slice(0, 10);
       const overdueCount = open.filter((d) => d.dueDate! < today).length;
       const upcoming = open.sort((a, b) => (a.dueDate! < b.dueDate! ? -1 : 1))[0];
+      const scopedEvents = summary.events.filter((e) => CURRENT_CYCLE_EVENTS.includes(e));
       return {
         ...summary,
         deliverablesDone: done,
         deliverablesTotal: total,
         overdueCount,
         nextDeadline: upcoming?.dueDate ?? null,
+        partnerObligations: derivePartnerObligations(scopedEvents, deliverables),
       };
     }),
   );
@@ -312,11 +356,52 @@ export async function getDeliverablesForCompany(
   const records = await queryRecords(DELIVERABLES_OBJECT, {
     filter: { company: { target_record_id: companyRecordId } },
   });
+
+  // A deliverable's catalogue_item is sometimes deliberately an inventory
+  // "atom" (e.g. "Booth Space — 4x4m") standing in for the real sold bundle
+  // (e.g. "4x4m Booth") in source_catalogue_item — done specifically so the
+  // INV Apps Script's Sold-count tally never double-counts a bundle
+  // alongside its own atom (see the 2026-09-15 self-referencing-bundle
+  // fix). That's correct for counting, but Name is a read-only formula off
+  // catalogue_item, so it surfaces the atom's name ("Booth Space — 4x4m")
+  // everywhere, including to the partner — who never bought bare booth
+  // space, only the real "4x4m Booth" package.
+  //
+  // IMPORTANT: this only applies to the space-atom deliverable itself.
+  // Sub-items within that space (Carpet, Furniture, Backwall, ...) also
+  // carry a source_catalogue_item, but theirs points at the space atom
+  // *they* sit inside, not at the top-level sold bundle — resolving it the
+  // same way would wrongly relabel every piece of furniture as "Booth
+  // Space — 4x4m" too. Gate on the raw name actually being a bare "Booth
+  // Space — ..." atom, not merely on source differing from catalogue_item.
+  const BOOTH_SPACE_ATOM = /^Booth Space\b/i;
+  const rawNames = records.map((r) => firstText(r.values, "name") ?? "(untitled deliverable)");
+  const sourceItems = records.map((r) => firstRecordRef(r.values, "source_catalogue_item"));
+  const soldBundleIds = Array.from(
+    new Set(
+      sourceItems
+        .filter((sourceItem, i) => BOOTH_SPACE_ATOM.test(rawNames[i]) && sourceItem)
+        .map((sourceItem) => sourceItem!.recordId),
+    ),
+  );
+  const soldBundleNames = new Map<string, string>();
+  await Promise.all(
+    soldBundleIds.map(async (id) => {
+      const rec = await getRecord(INVENTORY_OBJECT, id);
+      const name = rec ? firstText(rec.values, "name") : null;
+      if (name) soldBundleNames.set(id, name);
+    }),
+  );
+
   return records
-    .map(
-      (r): Deliverable => ({
+    .map((r, i): Deliverable => {
+      const sourceItem = sourceItems[i];
+      const rawName = rawNames[i];
+      const soldName =
+        BOOTH_SPACE_ATOM.test(rawName) && sourceItem ? soldBundleNames.get(sourceItem.recordId) : undefined;
+      return {
         id: r.id.record_id,
-        name: firstText(r.values, "name") ?? "(untitled deliverable)",
+        name: soldName ?? rawName,
         workstream: firstSelectTitle(r.values, "workstream") ?? "",
         phase: firstSelectTitle(r.values, "phase") ?? "",
         status: toDeliverableStatus(firstSelectTitle(r.values, "status")),
@@ -324,8 +409,8 @@ export async function getDeliverablesForCompany(
         quantity: firstNumber(r.values, "quantity"),
         notes: firstText(r.values, "notes"),
         events: allSelectTitles(r.values, "event") as EventName[],
-      }),
-    )
+      };
+    })
     // The two known "TEST ROW" records in real data carry status N/A
     // specifically so they can be excluded like this.
     .filter(

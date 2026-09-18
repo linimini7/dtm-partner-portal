@@ -8,6 +8,9 @@ interface Row extends PortalSummary {
   csLeadName: string;
   salesLeadName: string;
   accessCode: string;
+  /** How much of what the partner owes DTM (logo/guidelines, announce, Guardians, named-attendee seats) is actually done — see lib/portal-view.ts's getPartnerObligationProgress. */
+  partnerDeliverablesDone: number;
+  partnerDeliverablesTotal: number;
 }
 
 const COLUMNS = [
@@ -18,9 +21,8 @@ const COLUMNS = [
   { key: "salesLead", label: "Sales lead", width: 165, min: 90 },
   { key: "contract", label: "Contract", width: 100, min: 80 },
   { key: "deliverables", label: "Deliverables", width: 110, min: 90 },
-  { key: "nextDeadline", label: "Next deadline", width: 150, min: 110 },
+  { key: "partnerDeliverables", label: "Receivables", width: 170, min: 130 },
   { key: "portalStatus", label: "Portal status", width: 130, min: 90 },
-  { key: "lastView", label: "Last partner view", width: 150, min: 120 },
 ] as const;
 
 type ColumnKey = (typeof COLUMNS)[number]["key"];
@@ -56,13 +58,12 @@ function sortValue(row: Row, column: ColumnKey): string | number | null {
       return row.contractSignedDate;
     case "deliverables":
       return row.deliverablesTotal > 0 ? row.deliverablesDone / row.deliverablesTotal : null;
-    case "nextDeadline":
-      return row.nextDeadline;
+    case "partnerDeliverables":
+      return row.partnerDeliverablesTotal > 0
+        ? row.partnerDeliverablesDone / row.partnerDeliverablesTotal
+        : null;
     case "portalStatus":
       return row.onboardingStage;
-    case "lastView":
-      // Not tracked yet — every row is equal, so this is a no-op until real data exists.
-      return null;
     default:
       return null;
   }
@@ -158,8 +159,13 @@ function ColumnResizeHandle({
   return (
     <div
       onMouseDown={onMouseDown}
-      className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize select-none hover:bg-dtm-hairline-2"
-    />
+      // A wider invisible hit area than the visible line itself (centered on
+      // the column edge via -right-1.5) — the thin 6px line alone was fiddly
+      // to grab precisely.
+      className="group absolute top-0 -right-1.5 z-10 h-full w-3.5 cursor-col-resize select-none"
+    >
+      <div className="mx-auto h-full w-[3px] group-hover:bg-dtm-hairline-2 group-active:bg-fg-accent" />
+    </div>
   );
 }
 
@@ -171,6 +177,33 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
   const [widths, setWidths] = useState<Record<ColumnKey, number>>(() =>
     Object.fromEntries(COLUMNS.map((c) => [c.key, c.width])) as Record<ColumnKey, number>,
   );
+  const [widthsHydrated, setWidthsHydrated] = useState(false);
+  const widthsStorageKey = `portals-table-widths:${staffEmail ?? "anonymous"}`;
+
+  useEffect(() => {
+    // Same hydrate-after-mount exception as the sort effect below — column
+    // widths dragged to a comfortable size shouldn't reset on every reload.
+    try {
+      const saved = window.localStorage.getItem(widthsStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<Record<ColumnKey, number>>;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setWidths((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // Ignore a missing/corrupt value — falls back to the defaults.
+    }
+    setWidthsHydrated(true);
+  }, [widthsStorageKey]);
+
+  useEffect(() => {
+    if (!widthsHydrated) return;
+    try {
+      window.localStorage.setItem(widthsStorageKey, JSON.stringify(widths));
+    } catch {
+      // Private-browsing or storage-disabled — resizing still works, it just won't persist.
+    }
+  }, [widths, widthsStorageKey, widthsHydrated]);
 
   // Plain click sets a column as the sole sort; shift-click adds it as the
   // next tiebreaker instead, so staff can build "name, then contract date,
@@ -295,10 +328,19 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
             Clear sort
           </button>
         )}
+        <button
+          type="button"
+          onClick={() =>
+            setWidths(Object.fromEntries(COLUMNS.map((c) => [c.key, c.width])) as Record<ColumnKey, number>)
+          }
+          className="rounded-[var(--radius-panel)] border border-dtm-hairline px-3 py-2 text-sm text-fg-3"
+        >
+          Reset column widths
+        </button>
       </div>
       <div className="mb-4 -mt-2 text-xs text-fg-5">
-        Click a column to sort by it · shift-click another to add it as a tiebreaker. Your sort is
-        remembered next time you open this page.
+        Click a column to sort by it · shift-click another to add it as a tiebreaker. Drag a column&apos;s
+        right edge to resize it. Both are remembered next time you open this page.
       </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-card)] border border-dtm-hairline">
@@ -371,14 +413,17 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
                   style={r.deliverablesTotal === 0 ? { color: "var(--alert)" } : undefined}
                 >
                   {r.deliverablesDone}/{r.deliverablesTotal}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  {r.nextDeadline ?? "—"}
                   {r.overdueCount > 0 && (
                     <span className="ml-1">
                       <StatusPill label={`${r.overdueCount} overdue`} tone="alert" />
                     </span>
                   )}
+                </td>
+                <td
+                  className="px-3 py-2 whitespace-nowrap"
+                  style={r.partnerDeliverablesTotal === 0 ? { color: "var(--alert)" } : undefined}
+                >
+                  {r.partnerDeliverablesDone}/{r.partnerDeliverablesTotal}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   {r.onboardingStage === "Portal live" ? (
@@ -387,7 +432,6 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
                     <StatusPill label="Draft" tone="neutral" />
                   )}
                 </td>
-                <td className="overflow-hidden truncate px-3 py-2 text-fg-4">Not tracked yet</td>
               </tr>
             ))}
           </tbody>

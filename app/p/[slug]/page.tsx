@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth";
 import { getPortalBySlug, getStaffDirectory } from "@/lib/data";
 import { getEffectivePortalContent, getMediaKit } from "@/lib/portal-content";
 import { getBrandAssets, getEmailDerivedContact } from "@/lib/brand-assets";
+import { getCheckedObligationIds, getObligationLinks, getObligationNominees, isNomineeObligation, type Nominee } from "@/lib/obligation-checks";
+import { getTicketCodes } from "@/lib/ticket-codes";
 import { verifyPortalCode } from "@/lib/portal-code";
 import { buildPortalView } from "@/lib/portal-view";
 import CodeGate from "./CodeGate";
@@ -54,6 +56,15 @@ export default async function PortalPage({
   const partnerContact = portal.poc
     ? { name: portal.poc.name, email: portal.poc.email }
     : await getEmailDerivedContact(slug);
+  const checkedObligationIds = Array.from(await getCheckedObligationIds(slug));
+  const announceLinks = await getObligationLinks(slug, "announce");
+  const nomineeObligationIds = view.partnerObligations.map((o) => o.id).filter(isNomineeObligation);
+  const nomineesByObligation: Record<string, Nominee[]> = Object.fromEntries(
+    await Promise.all(
+      nomineeObligationIds.map(async (id) => [id, await getObligationNominees(slug, id)] as const),
+    ),
+  );
+  const ticketCodes = await getTicketCodes(slug);
 
   return (
     <PortalShell
@@ -64,6 +75,10 @@ export default async function PortalPage({
       portalContent={portalContent}
       mediaKit={mediaKit}
       brandAssets={brandAssets}
+      checkedObligationIds={checkedObligationIds}
+      announceLinks={announceLinks}
+      nomineesByObligation={nomineesByObligation}
+      ticketCodes={ticketCodes}
       slug={slug}
     />
   );

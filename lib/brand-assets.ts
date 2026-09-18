@@ -52,6 +52,35 @@ export async function getEmailDerivedContact(slug: string): Promise<EmailDerived
   return { name: rows[0]?.partner_contact_name ?? null, email };
 }
 
+/**
+ * A partner proposing/updating their own point of contact directly (as
+ * opposed to lib/email-ingestion.ts inferring one from a real email).
+ * Writes the same partner_contact_* columns getEmailDerivedContact reads —
+ * an Attio-set "poc" still takes precedence for display wherever that's
+ * checked (see app/p/[slug]/page.tsx and admin/page.tsx), so this only
+ * actually changes what's shown when no staff-set contact exists yet;
+ * otherwise it's a proposal staff see via the activity log without it
+ * silently overriding what they set in Attio.
+ */
+export async function upsertPartnerContact(
+  scope: string,
+  name: string | null,
+  email: string,
+  updatedBy: string,
+): Promise<void> {
+  await getPool().query(
+    `INSERT INTO portal_content (scope, partner_contact_name, partner_contact_email, partner_contact_source, updated_at, updated_by)
+     VALUES ($1, $2, $3, 'partner', now(), $4)
+     ON CONFLICT (scope) DO UPDATE SET
+       partner_contact_name = EXCLUDED.partner_contact_name,
+       partner_contact_email = EXCLUDED.partner_contact_email,
+       partner_contact_source = EXCLUDED.partner_contact_source,
+       updated_at = now(),
+       updated_by = EXCLUDED.updated_by`,
+    [scope, name, email, updatedBy],
+  );
+}
+
 export async function upsertBrandInfo(
   scope: string,
   websiteUrl: string | null,

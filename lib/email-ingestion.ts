@@ -24,6 +24,8 @@
 import { getPool } from "@/lib/db";
 import { listPartnerDomains } from "@/lib/attio";
 import { getBrandAssets, hasLogoWithHash, hashLogoBytes, upsertBrandLogo } from "@/lib/brand-assets";
+import { extractImagesFromZip } from "@/lib/zip-images";
+import { logActivity } from "@/lib/activity-log";
 import {
   flattenParts,
   getAllRecipients,
@@ -45,6 +47,8 @@ const IMAGE_MIME_TYPES = new Set([
   "image/webp",
   "image/svg+xml",
 ]);
+
+const ZIP_MIME_TYPES = new Set(["application/zip", "application/x-zip-compressed"]);
 
 function domainOf(email: string): string {
   return email.split("@")[1]?.toLowerCase() ?? "";
@@ -98,10 +102,11 @@ export async function ingestPartnerEmails(): Promise<IngestionResult> {
     const match = matchPartner(message, partners);
     if (!match) continue;
 
-    // ---- logos: drop any real (non-inline) image attachment into the next open slot ----
+    // ---- logos: drop any real (non-inline) image or .zip-of-images attachment into the next open slot ----
     // Excludes inline images — email-signature logos, headshots, tracking
     // pixels embedded in the body rather than deliberately attached.
-    const attachmentParts = flattenParts(message.payload.parts).filter(
+    const allParts = flattenParts(message.payload.parts);
+    const attachmentParts = allParts.filter(
       (p) =>
         p.filename &&
         p.mimeType &&
@@ -109,19 +114,41 @@ export async function ingestPartnerEmails(): Promise<IngestionResult> {
         p.body?.attachmentId &&
         isRealAttachment(p),
     );
-    if (attachmentParts.length > 0) {
+    const zipParts = allParts.filter(
+      (p) =>
+        p.filename &&
+        p.mimeType &&
+        (ZIP_MIME_TYPES.has(p.mimeType) || p.filename.toLowerCase().endsWith(".zip")) &&
+        p.body?.attachmentId &&
+        isRealAttachment(p),
+    );
+
+    if (attachmentParts.length > 0 || zipParts.length > 0) {
       const current = await getBrandAssets(match.slug);
       const emptySlots = current.logoSlots.filter((s) => !s.hasImage).map((s) => s.slot);
+
+      // Re-scanning the same emails every run is how this stays a cursor-
+      // free, idempotent pass — content hash is what actually prevents a
+      // re-run from piling the same logo into a fresh slot each time.
+      async function tryAddLogo(bytes: Buffer, mimeType: string, filename: string): Promise<void> {
+        if (await hasLogoWithHash(match!.slug, hashLogoBytes(bytes))) return;
+        const slot = emptySlots.shift();
+        if (slot === undefined) return;
+        await upsertBrandLogo(match!.slug, slot, { bytes, mimeType }, "email-ingestion");
+        logosAdded.push({ slug: match!.slug, filename });
+        await logActivity(match!.slug, "email-ingestion", `Logo arrived by email (${filename})`);
+      }
+
       for (const part of attachmentParts) {
         const bytes = await getAttachmentBytes(message.id, part.body!.attachmentId!);
-        // Re-scanning the same emails every run is how this stays a cursor-
-        // free, idempotent pass — content hash is what actually prevents a
-        // re-run from piling the same logo into a fresh slot each time.
-        if (await hasLogoWithHash(match.slug, hashLogoBytes(bytes))) continue;
-        const slot = emptySlots.shift();
-        if (slot === undefined) break;
-        await upsertBrandLogo(match.slug, slot, { bytes, mimeType: part.mimeType! }, "email-ingestion");
-        logosAdded.push({ slug: match.slug, filename: part.filename! });
+        await tryAddLogo(bytes, part.mimeType!, part.filename!);
+      }
+
+      for (const part of zipParts) {
+        const zipBytes = await getAttachmentBytes(message.id, part.body!.attachmentId!);
+        for (const image of extractImagesFromZip(zipBytes)) {
+          await tryAddLogo(image.bytes, image.mimeType, `${part.filename} → ${image.filename}`);
+        }
       }
     }
 
@@ -144,6 +171,11 @@ export async function ingestPartnerEmails(): Promise<IngestionResult> {
         [match.slug, match.contactName, match.contactEmail],
       );
       contactsSet.push({ slug: match.slug, email: match.contactEmail });
+      await logActivity(
+        match.slug,
+        "email-ingestion",
+        `Point of contact detected from email: ${match.contactName ?? match.contactEmail} <${match.contactEmail}>`,
+      );
     }
   }
 

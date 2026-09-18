@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { updateBrandAll } from "./brand-actions";
+import { updateBrandAll, type UpdateBrandAllResult } from "./brand-actions";
 import LogoSlotsField from "./LogoSlotsField";
 import type { BrandAssets } from "@/lib/brand-assets";
 
@@ -23,10 +23,10 @@ function wordCount(text: string): number {
  */
 export default function BrandAssetsCard({ slug, brandAssets }: { slug: string; brandAssets: BrandAssets }) {
   const [editing, setEditing] = useState(false);
-  const [, formAction, isPending] = useActionState(async (_prev: number, formData: FormData) => {
-    await updateBrandAll(formData);
-    return Date.now();
-  }, 0);
+  const [result, formAction, isPending] = useActionState(
+    async (_prev: UpdateBrandAllResult | null, formData: FormData) => updateBrandAll(formData),
+    null,
+  );
   const wasPending = useRef(false);
   const [descriptionValue, setDescriptionValue] = useState(brandAssets.description ?? "");
   const words = wordCount(descriptionValue);
@@ -37,10 +37,19 @@ export default function BrandAssetsCard({ slug, brandAssets }: { slug: string; b
 
   useEffect(() => {
     if (wasPending.current && !isPending) {
-      setEditing(false);
+      // Stay in edit mode when the zip specifically failed, so the error
+      // below is visible and they can pick a different file and retry —
+      // everything else in the submit still saved either way.
+      if (!result?.zipError) {
+        // A deliberate exception to "don't setState in an effect": this
+        // reacts to the action's own pending→settled transition, which
+        // can't be observed any other way from outside the form.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setEditing(false);
+      }
     }
     wasPending.current = isPending;
-  }, [isPending]);
+  }, [isPending, result]);
 
   if (!editing) {
     return (
@@ -182,6 +191,11 @@ export default function BrandAssetsCard({ slug, brandAssets }: { slug: string; b
             onChange={(e) => setZipFileName(e.target.files?.[0]?.name ?? null)}
           />
         </div>
+        {result?.zipError && (
+          <div className="mt-2 text-sm" style={{ color: "var(--alert)" }}>
+            {result.zipError}
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">

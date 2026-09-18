@@ -3,11 +3,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import type { PortalView, TabId } from "@/lib/portal-view";
+import { workstreamDisplayName, type PortalView, type TabId } from "@/lib/portal-view";
 import type { PortalContentFields } from "@/lib/portal-content";
 import { mediaKitEventSlug, type EventMediaKit, type MediaKitEvent } from "@/lib/media-kit";
 import type { BrandAssets } from "@/lib/brand-assets";
 import BrandAssetsCard from "./BrandAssetsCard";
+import ObligationLinksEditor from "./ObligationLinksEditor";
+import NomineeEditor from "./NomineeEditor";
+import PartnerContactEditor from "./PartnerContactEditor";
+import MoatIntroForm from "./MoatIntroForm";
+import { toggleObligationChecked } from "./brand-actions";
+import { isNomineeObligation, type Nominee } from "@/lib/obligation-shared";
 
 // Partners are always directed to this shared inbox for customer success,
 // never to the individual CS lead's own address.
@@ -114,6 +120,22 @@ function KV({
   );
 }
 
+/** A read-only checkbox row reflecting real data (no click handler) — used for the "Submit your brand guidelines" sub-checks, which tick themselves rather than being manually toggled. */
+function AutoCheckRow({ checked, label }: { checked: boolean; label: string }) {
+  return (
+    <label className="flex items-center gap-2.5">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled
+        className="h-4 w-4 shrink-0"
+        style={{ accentColor: "var(--accent)" }}
+      />
+      <span className="text-[13px] text-fg-2">{label}</span>
+    </label>
+  );
+}
+
 export default function PortalShell({
   view,
   salesLead,
@@ -122,6 +144,10 @@ export default function PortalShell({
   portalContent,
   mediaKit,
   brandAssets,
+  checkedObligationIds,
+  announceLinks,
+  nomineesByObligation,
+  ticketCodes,
   slug,
 }: {
   view: PortalView;
@@ -132,11 +158,33 @@ export default function PortalShell({
   portalContent: PortalContentFields;
   mediaKit: Record<MediaKitEvent, EventMediaKit>;
   brandAssets: BrandAssets;
+  /** Which Action Items obligations this partner has ticked off themselves — real, persisted state (see lib/obligation-checks.ts), unlike the staff-only Key Dates checklist below. */
+  checkedObligationIds: string[];
+  /** Evidence links attached to "Publicly announce the partnership" — see ObligationLinksEditor. */
+  announceLinks: string[];
+  /** Named attendees per "nominate someone" obligation (guardians, programme seats, investor dinner) — see NomineeEditor. */
+  nomineesByObligation: Record<string, Nominee[]>;
+  /** Redemption code per ticket deliverable id, set by staff on /admin — see lib/ticket-codes.ts. */
+  ticketCodes: Record<string, string>;
   slug: string;
 }) {
   const [tab, setTab] = useState<TabId>("overview");
   const [filter, setFilter] = useState("All");
   const [done, setDone] = useState<Record<string, boolean>>({});
+  const [obligationChecks, setObligationChecks] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(checkedObligationIds.map((id) => [id, true])),
+  );
+  const [obligationPending, setObligationPending] = useState<string | null>(null);
+
+  async function handleObligationToggle(obligationId: string, title: string, checked: boolean) {
+    setObligationChecks((prev) => ({ ...prev, [obligationId]: checked }));
+    setObligationPending(obligationId);
+    try {
+      await toggleObligationChecked(slug, obligationId, title, checked);
+    } finally {
+      setObligationPending(null);
+    }
+  }
 
   const visibleTabs = view.tabs.filter((t) => !t.staffOnly || isStaff);
   const partnerTabs = visibleTabs.filter((t) => !t.staffOnly);
@@ -208,15 +256,26 @@ export default function PortalShell({
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
-          {partnerContact && (
-            <div className="border border-dtm-hairline rounded-[10px] p-3.5 flex flex-col gap-0.5">
-              <div className="eyebrow">Point of contact</div>
-              <div className="text-[13px] font-medium text-fg-1">{partnerContact.name ?? partnerContact.email}</div>
-              {partnerContact.email && (
-                <div className="text-[11.5px] text-fg-4">{partnerContact.email}</div>
-              )}
-            </div>
-          )}
+          <div className="border border-dtm-hairline rounded-[10px] p-3.5 flex flex-col gap-0.5">
+            <div className="eyebrow">Point of contact</div>
+            {partnerContact ? (
+              <>
+                <div className="text-[13px] font-medium text-fg-1">
+                  {partnerContact.name ?? partnerContact.email}
+                </div>
+                {partnerContact.email && (
+                  <div className="text-[11.5px] text-fg-4">{partnerContact.email}</div>
+                )}
+              </>
+            ) : (
+              <div className="text-[11.5px] text-fg-4">Not set yet</div>
+            )}
+            <PartnerContactEditor
+              slug={slug}
+              initialName={partnerContact?.name ?? ""}
+              initialEmail={partnerContact?.email ?? ""}
+            />
+          </div>
           <div className="border border-dtm-hairline rounded-[10px] p-3.5 flex flex-col gap-2.5">
             <div className="eyebrow">Your point of contact</div>
             <div className="flex flex-col gap-0.5">
@@ -235,16 +294,16 @@ export default function PortalShell({
 
       <main className="p-[34px_44px_72px] flex flex-col gap-7 min-w-0">
         <header className="flex justify-between items-start gap-6 flex-wrap">
-          <div className="flex flex-col gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="m-0 text-[27px] font-semibold tracking-[-0.025em] text-fg-1">
                 {view.companyName} × Deep Tech Momentum
               </h1>
             </div>
-            <div className="text-[13px] text-fg-4">{view.headerSubtitle}</div>
+            <div className="max-w-[640px] text-[13px] text-fg-4">{view.headerSubtitle}</div>
           </div>
           {view.daysToEvents.length > 0 && (
-            <div className="flex gap-8">
+            <div className="ml-auto flex gap-8">
               {view.daysToEvents.map((d) => (
                 <div key={d.label} className="text-right">
                   <div className="eyebrow">{d.label}</div>
@@ -476,17 +535,6 @@ export default function PortalShell({
 
         {tab === "dates" && isStaff && (
           <div className="flex flex-col gap-[18px]">
-            <div
-              className="rounded-[10px] p-[15px_18px] text-[13.5px] leading-[1.55]"
-              style={{
-                border: "1px solid rgb(232 107 107 / 30%)",
-                background: "var(--alert-wash)",
-                color: "#e9c0c0",
-              }}
-            >
-              Staff only. Dates in bold are hard deadlines. After each one the item cannot be
-              produced — not late, not at all.
-            </div>
             <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface overflow-hidden">
               <div className="grid gap-[18px] p-[13px_20px] border-b border-dtm-hairline eyebrow" style={{ gridTemplateColumns: "minmax(96px,120px) minmax(0,1fr) minmax(120px,190px)" }}>
                 <div>Date</div>
@@ -517,7 +565,7 @@ export default function PortalShell({
                   >
                     {d.what}
                   </div>
-                  <div className="text-[12.5px] text-fg-4">{d.workstream}</div>
+                  <div className="text-[12.5px] text-fg-4">{workstreamDisplayName(d.workstream)}</div>
                 </div>
               ))}
             </div>
@@ -663,32 +711,46 @@ export default function PortalShell({
                   <div className="text-[12.5px] text-fg-4">No passes recorded yet.</div>
                 ) : (
                   <div className="flex flex-col gap-2.5">
-                    {view.ticketItems.map((d) => (
-                      <div
-                        key={d.id}
-                        className="flex justify-between items-center gap-3 rounded-[9px] p-3.5"
-                        style={{ border: "1px solid var(--dtm-hairline)", background: "var(--dtm-ink-2)" }}
-                      >
-                        <div className="text-[13.5px] text-fg-1">{d.name}</div>
-                        {d.quantity && d.quantity > 1 && (
-                          <div className="font-mono text-[15px] text-fg-3">× {d.quantity}</div>
-                        )}
-                      </div>
-                    ))}
+                    {view.ticketItems.map((d) => {
+                      const code = ticketCodes[d.id];
+                      return (
+                        <div
+                          key={d.id}
+                          className="flex flex-col gap-2 rounded-[9px] p-3.5"
+                          style={{ border: "1px solid var(--dtm-hairline)", background: "var(--dtm-ink-2)" }}
+                        >
+                          <div className="flex justify-between items-center gap-3">
+                            <div className="text-[13.5px] text-fg-1">{d.name}</div>
+                            {d.quantity && d.quantity > 1 && (
+                              <div className="font-mono text-[15px] text-fg-3">× {d.quantity}</div>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between gap-3 border-t pt-2" style={{ borderColor: "var(--dtm-hairline)" }}>
+                            <span className="eyebrow">Redemption code</span>
+                            {code ? (
+                              <span className="font-mono text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+                                {code}
+                              </span>
+                            ) : (
+                              <span className="font-mono text-[12px] text-fg-5">Not yet generated</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
-                <div
-                  className="rounded-[9px] p-4 flex flex-col gap-1.5"
-                  style={{ border: "1px dashed var(--dtm-hairline-2)", background: "var(--dtm-ink-2)" }}
-                >
-                  <div className="eyebrow">Your unique code</div>
-                  <div className="font-mono text-fg-4 text-sm">Not yet generated</div>
+                {view.ticketItems.length > 0 && (
                   <div className="text-[12.5px] text-fg-4 leading-[1.5]">
-                    We will email your code and it will appear here. Register the passes even
-                    before you know who is coming — names can be transferred later.
+                    Use each code at{" "}
+                    <a href="https://www.deeptech.build/tickets" target="_blank" rel="noreferrer">
+                      deeptech.build/tickets
+                    </a>{" "}
+                    to redeem the matching pass. Register the passes even before you know who is
+                    coming — names can be transferred later.
                   </div>
-                </div>
+                )}
               </Card>
 
               <Card>
@@ -883,18 +945,15 @@ export default function PortalShell({
                     </div>
                     <div className="text-[13px] text-fg-3 leading-[1.6]">
                       <strong style={{ color: "var(--accent)" }}>Moat Studio</strong> is our design
-                      partner and already knows the DTM specifications inside out — talk to them
-                      directly and they&apos;ll turn your brief into print-ready artwork. A direct
-                      arrangement between you and Moat, entirely optional.
+                      partner and already knows the DTM specifications inside out — they&apos;ll turn
+                      your brief into print-ready artwork. Fill out the form below and
+                      we&apos;ll connect you with them directly.
                     </div>
-                    <a
-                      href="#"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-mono text-[11px] tracking-[0.1em] uppercase"
-                    >
-                      Talk to Moat Studio →
-                    </a>
+                    <MoatIntroForm
+                      slug={slug}
+                      initialName={partnerContact?.name ?? ""}
+                      initialEmail={partnerContact?.email ?? ""}
+                    />
                   </Card>
                 )}
               </div>
@@ -909,12 +968,90 @@ export default function PortalShell({
               A few things we need from you to keep everything on track.
             </div>
             <div className="flex flex-col gap-3">
-              {view.partnerObligations.map((o) => (
-                <Card key={o.id}>
-                  <div className="text-[14px] font-medium text-fg-1">{o.title}</div>
-                  <div className="text-[12.5px] text-fg-4 leading-[1.5]">{o.note}</div>
-                </Card>
-              ))}
+              {view.partnerObligations.map((o) => {
+                // "Submit your brand guidelines" reflects real data instead
+                // of one manual tick — three sub-checks that each tick
+                // themselves the moment that piece exists (logo uploaded
+                // either by the partner or via email, website URL,
+                // description), rather than a single checkbox.
+                if (o.id === "logo") {
+                  const hasLogo = brandAssets.logoSlots.some((s) => s.hasImage);
+                  const hasWebsite = !!brandAssets.websiteUrl;
+                  const hasDescription = !!brandAssets.description;
+                  const allDone = hasLogo && hasWebsite && hasDescription;
+                  return (
+                    <Card key={o.id}>
+                      <div className="text-[14px] font-medium text-fg-1">{o.title}</div>
+                      <div className="text-[12.5px] text-fg-4 leading-[1.5]">{o.note}</div>
+                      <div className="mt-2 flex flex-col gap-2">
+                        <AutoCheckRow checked={hasLogo} label="Your logo" />
+                        <AutoCheckRow checked={hasWebsite} label="Your website URL" />
+                        <AutoCheckRow
+                          checked={hasDescription}
+                          label="Description of your company (max 250 words)"
+                        />
+                      </div>
+                      {!allDone && (
+                        <div className="mt-1 flex items-center justify-between gap-3 rounded-[9px] p-3 text-[12.5px] leading-[1.5]"
+                          style={{ border: "1px solid var(--dtm-hairline)", background: "var(--dtm-ink-2)" }}
+                        >
+                          <span className="text-fg-4">
+                            These tick themselves off — upload your logo and save your website URL
+                            and description under Tickets &amp; assets, and they&apos;ll check here
+                            automatically.
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setTab("assets")}
+                            className="shrink-0 whitespace-nowrap text-[12.5px] font-medium"
+                            style={{ color: "var(--accent)" }}
+                          >
+                            Go there →
+                          </button>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                }
+
+                const checked = Boolean(obligationChecks[o.id]);
+                const pending = obligationPending === o.id;
+                return (
+                  <Card key={o.id}>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={pending}
+                        onChange={(e) => handleObligationToggle(o.id, o.title, e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0"
+                        style={{ accentColor: "var(--accent)" }}
+                      />
+                      <div className="w-full">
+                        <div className="text-[14px] font-medium text-fg-1">{o.title}</div>
+                        <div className="text-[12.5px] text-fg-4 leading-[1.5]">{o.note}</div>
+                        {pending && <div className="mt-1 text-[11px] text-fg-5">Saving…</div>}
+                        <div className="mt-1.5 text-[11px] text-fg-5 leading-[1.4]">
+                          The DTM team is notified when you check or uncheck this — please only tick it
+                          once it&apos;s actually done, and untick it if that changes, so we don&apos;t get
+                          mixed signals.
+                        </div>
+                      </div>
+                    </label>
+                    {o.id === "announce" && (
+                      <ObligationLinksEditor slug={slug} obligationId="announce" initialLinks={announceLinks} />
+                    )}
+                    {isNomineeObligation(o.id) && (
+                      <NomineeEditor
+                        slug={slug}
+                        obligationId={o.id}
+                        title={o.title}
+                        initialNominees={nomineesByObligation[o.id] ?? []}
+                      />
+                    )}
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}

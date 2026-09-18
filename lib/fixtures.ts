@@ -1,3 +1,4 @@
+import { derivePartnerObligations } from "@/lib/portal-view";
 import { slugify } from "@/lib/slug";
 import type {
   Deliverable,
@@ -97,6 +98,7 @@ const summaries: Record<string, PortalSummary> = {
     deliverablesTotal: 0,
     overdueCount: 0,
     nextDeadline: null,
+    partnerObligations: derivePartnerObligations(["DTM27"], []),
   },
   "brightline-robotics": {
     companyRecordId: "882de8c2-77cc-4fae-a7a8-3c5a96c886b5",
@@ -116,6 +118,7 @@ const summaries: Record<string, PortalSummary> = {
     deliverablesTotal: 0,
     overdueCount: 0,
     nextDeadline: null,
+    partnerObligations: derivePartnerObligations(["SPARTA 2027"], []),
   },
   "vertex-dynamics": {
     companyRecordId: "f756a94a-44c6-40c0-abd7-4c769e6ffa6d",
@@ -137,6 +140,7 @@ const summaries: Record<string, PortalSummary> = {
     nextDeadline: VERTEX_DELIVERABLES.map((d) => d.dueDate)
       .filter((d): d is string => !!d)
       .sort()[0],
+    partnerObligations: derivePartnerObligations(["SPARTA 2027", "DTM27"], VERTEX_DELIVERABLES),
   },
 };
 

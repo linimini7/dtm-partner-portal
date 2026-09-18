@@ -77,6 +77,86 @@ export interface PartnerObligation {
   note: string;
 }
 
+// Programme seats (CXO Summit / CVC Summit / LP-GP Marketplace) and
+// Investor Dinner seats each need a partner to name real attendees — per
+// the CS Playbook's configuration matrix ("Programme seats... Section 3 +
+// action item... which programme, how many, named attendees"). Matched by
+// deliverable name rather than a dedicated Attio field, since that's all
+// that currently distinguishes these — same reasoning as HARD_DEADLINE_DATES.
+const NAMED_ATTENDEE_PROGRAMMES: { id: string; match: RegExp; label: string }[] = [
+  { id: "programme-lpgp", match: /lp[\s-]*gp\s*marketplace/i, label: "the LP-GP Marketplace" },
+  { id: "programme-cxo", match: /cxo\s*summit/i, label: "the CXO Summit" },
+  { id: "programme-cvc", match: /cvc\s*summit/i, label: "the CVC Summit" },
+  { id: "investor-dinner", match: /investor.*dinner/i, label: "the investor dinner" },
+];
+
+/**
+ * What a partner owes DTM under contract Section 5 — logo/guidelines and
+ * announcing the partnership always apply; Guardians and named-attendee
+ * programme seats only apply when the partner actually bought them.
+ * Standalone (not just inlined into buildPortalView) so the /portals staff
+ * table can derive the same obligation list per company without needing a
+ * full PortalView.
+ */
+export function derivePartnerObligations(scopedEvents: EventName[], deliverables: Deliverable[]): PartnerObligation[] {
+  const partnerObligations: PartnerObligation[] = [
+    {
+      id: "logo",
+      title: "Submit your logo & brand guidelines",
+      note: "So we can start using it across signage and campaign materials.",
+    },
+    {
+      id: "announce",
+      title: "Publicly announce the partnership",
+      note: "A social media post or newsletter mention — whenever you're ready.",
+    },
+  ];
+  if (scopedEvents.includes("DTM27")) {
+    partnerObligations.push({
+      id: "guardians",
+      title: "Nominate Guardians for the programme",
+      note: "Rolling — the earlier you nominate, the better.",
+    });
+  }
+  for (const programme of NAMED_ATTENDEE_PROGRAMMES) {
+    if (deliverables.some((d) => programme.match.test(d.name))) {
+      partnerObligations.push({
+        id: programme.id,
+        title: `Nominate your attendee(s) for ${programme.label}`,
+        note: "Let us know who's coming so we can confirm their seat.",
+      });
+    }
+  }
+  return partnerObligations;
+}
+
+/**
+ * Collapses a partner's obligation list into one "X out of Y" progress
+ * count for the staff table — "logo" counts as 3 sub-items (logo, website,
+ * description) since those tick independently; every other obligation is a
+ * single manually-checked item.
+ */
+export function getPartnerObligationProgress(
+  partnerObligations: PartnerObligation[],
+  brandAssets: { logoSlots: { hasImage: boolean }[]; websiteUrl: string | null; description: string | null },
+  checkedObligationIds: Set<string>,
+): { done: number; total: number } {
+  let done = 0;
+  let total = 0;
+  for (const o of partnerObligations) {
+    if (o.id === "logo") {
+      total += 3;
+      if (brandAssets.logoSlots.some((s) => s.hasImage)) done++;
+      if (brandAssets.websiteUrl) done++;
+      if (brandAssets.description) done++;
+    } else {
+      total += 1;
+      if (checkedObligationIds.has(o.id)) done++;
+    }
+  }
+  return { done, total };
+}
+
 export interface PortalView {
   companyName: string;
   eventLabel: string;
@@ -122,9 +202,14 @@ export function formatDeliverableName(d: Deliverable): string {
  * within it. Matched by the deliverable's name *starting* with Booth/Lounge
  * rather than merely containing it — "Carpet (booth)" mentions "booth" too,
  * but is a sub-item, not the space itself.
+ *
+ * The space atom's raw Attio name ("Booth Space — 4x4m") gets swapped for
+ * the real sold bundle's name ("4x4m Booth") before this ever sees it — see
+ * lib/attio.ts's getDeliverablesForCompany — so also match that bundle
+ * naming ("2x4m Booth", "4x8m Booth", ...) or it'd stop sorting first.
  */
 function isOverarchingBoothItem(d: Deliverable): boolean {
-  return /^(booth|lounge)\b/i.test(d.name.trim());
+  return /^(booth|lounge)\b/i.test(d.name.trim()) || /^\d+x\d+m booth\b/i.test(d.name.trim());
 }
 
 function boothItemOrder(a: Deliverable, b: Deliverable): number {
@@ -137,6 +222,16 @@ function boothItemOrder(a: Deliverable, b: Deliverable): number {
 function daysUntil(iso: string): number {
   const ms = new Date(iso + "T00:00:00Z").getTime() - Date.now();
   return Math.max(0, Math.ceil(ms / 86_400_000));
+}
+
+/**
+ * Attio's real "Matchmaking / Sourcing" select option is displayed as
+ * "Matchmaking / Product" per the CS Playbook's canonical workstream
+ * naming (Notion: "1 · The CS model") — display-only, so it doesn't touch
+ * the raw value anything else here matches/filters on.
+ */
+export function workstreamDisplayName(workstream: string): string {
+  return workstream === "Matchmaking / Sourcing" ? "Matchmaking / Product" : workstream;
 }
 
 // Friendly label + display order for "Your partnership at a glance". A
@@ -316,25 +411,7 @@ export function buildPortalView(portal: PortalDetail): PortalView {
   // partners actually sponsoring DTM27 — not a SPARTA27-only partner.
   const hasGuardian = scopedEvents.includes("DTM27");
 
-  const partnerObligations: PartnerObligation[] = [
-    {
-      id: "logo",
-      title: "Submit your logo & brand guidelines",
-      note: "So we can start using it across signage and campaign materials.",
-    },
-    {
-      id: "announce",
-      title: "Publicly announce the partnership",
-      note: "A social media post or newsletter mention — whenever you're ready.",
-    },
-  ];
-  if (hasGuardian) {
-    partnerObligations.push({
-      id: "guardians",
-      title: "Nominate Guardians for the programme",
-      note: "Rolling — the earlier you nominate, the better.",
-    });
-  }
+  const partnerObligations = derivePartnerObligations(scopedEvents, deliverables);
 
   const tabs: { id: TabId; label: string; staffOnly?: boolean }[] = [
     { id: "overview", label: "Overview" },

@@ -1,8 +1,13 @@
 /**
- * Minimal Gmail API client for partnerships@deeptech.build, used only to
+ * Minimal Gmail API client for partnerships@deeptech.build. Most of this
+ * file (message search/read) only ever needed gmail.readonly, used to
  * ingest partner-sent logos and contact info (see lib/email-ingestion.ts).
- * Read-only (gmail.readonly scope) — never sends, replies, or modifies
- * anything in the mailbox.
+ *
+ * createDraft() below is the one write operation and needs the broader
+ * gmail.compose scope, which the currently-configured refresh token does
+ * NOT have — it'll 403 until GMAIL_REFRESH_TOKEN is reissued via a fresh
+ * OAuth consent that includes gmail.compose (readonly alone can't create
+ * drafts). See lib/moat-intro.ts for the one caller.
  *
  * Auth is a plain OAuth refresh-token exchange (no googleapis dependency
  * needed for the handful of endpoints this uses) — see the conversation
@@ -102,6 +107,39 @@ export function flattenParts(parts: GmailMessagePart[] | undefined): GmailMessag
 
 function headerValue(message: GmailMessage, name: string): string | null {
   return message.payload.headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? null;
+}
+
+/**
+ * Creates a Gmail draft in partnerships@deeptech.build — requires
+ * gmail.compose, see this file's header comment. Throws on any failure
+ * (including insufficient scope) so callers can decide how to degrade —
+ * see lib/moat-intro.ts, which still logs the request even when the draft
+ * itself couldn't be created.
+ */
+export async function createDraft(options: {
+  to: string[];
+  cc?: string[];
+  subject: string;
+  body: string;
+}): Promise<void> {
+  const token = await getAccessToken();
+  const lines = [
+    `To: ${options.to.join(", ")}`,
+    ...(options.cc && options.cc.length > 0 ? [`Cc: ${options.cc.join(", ")}`] : []),
+    `Subject: ${options.subject}`,
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    options.body,
+  ];
+  const raw = Buffer.from(lines.join("\r\n")).toString("base64url");
+  const res = await fetch(`${GMAIL_BASE}/drafts`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ message: { raw } }),
+  });
+  if (!res.ok) {
+    throw new Error(`Gmail draft creation failed: ${res.status} ${await res.text().catch(() => "")}`);
+  }
 }
 
 /** Parses "Name <email@x.com>, other@y.com" style header values into individual addresses. */
