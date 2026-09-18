@@ -20,8 +20,8 @@ function initials(contact: ContactValue): string {
 function Avatar({ contact }: { contact: ContactValue }) {
   return (
     <div
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-medium"
-      style={{ background: "var(--dtm-surface-2)", color: "var(--fg-3)" }}
+      className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[6px] text-[10px] font-semibold"
+      style={{ background: "var(--dtm-hairline)", color: "var(--fg-4)" }}
     >
       {initials(contact)}
     </div>
@@ -92,27 +92,27 @@ export default function PartnerContactsCard({
   const inputStyle = { background: "var(--dtm-ink-2)", borderColor: "var(--dtm-hairline-2)" };
 
   return (
-    <div className="border border-dtm-hairline rounded-[10px] p-3.5 flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2.5 px-2 py-1.5">
       {primary ? (
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-[9px]">
           <Avatar contact={primary} />
-          <div className="min-w-0">
-            <div className="truncate text-[13px] font-medium text-fg-1">{primary.name ?? primary.email}</div>
-            {primary.email && <div className="truncate text-[11.5px] text-fg-4">{primary.email}</div>}
-            {primary.phone && <div className="text-[11.5px] text-fg-4">{primary.phone}</div>}
+          <div className="min-w-0 text-[11px] leading-[1.35] text-fg-4">
+            <div className="truncate">{primary.name ?? primary.email}</div>
+            {primary.email && <div className="truncate" style={{ color: "#5A5A66" }}>{primary.email}</div>}
+            {primary.phone && <div style={{ color: "#5A5A66" }}>{primary.phone}</div>}
           </div>
         </div>
       ) : (
-        <div className="text-[11.5px] text-fg-4">Point of contact not set yet</div>
+        <div className="text-[11px] text-fg-4">Point of contact not set yet</div>
       )}
 
       {secondary?.email && (
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-[9px]">
           <Avatar contact={secondary} />
-          <div className="min-w-0">
-            <div className="truncate text-[13px] font-medium text-fg-1">{secondary.name ?? secondary.email}</div>
-            <div className="truncate text-[11.5px] text-fg-4">{secondary.email}</div>
-            {secondary.phone && <div className="text-[11.5px] text-fg-4">{secondary.phone}</div>}
+          <div className="min-w-0 text-[11px] leading-[1.35] text-fg-4">
+            <div className="truncate">{secondary.name ?? secondary.email}</div>
+            <div className="truncate" style={{ color: "#5A5A66" }}>{secondary.email}</div>
+            {secondary.phone && <div style={{ color: "#5A5A66" }}>{secondary.phone}</div>}
           </div>
         </div>
       )}

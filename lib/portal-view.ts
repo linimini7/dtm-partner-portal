@@ -37,13 +37,20 @@ export interface PackageRow {
 
 /**
  * Per-event accent color, so a dual-event partner can visually tell DTM27
- * and SPARTA27 apart at a glance (day-countdown boxes, event card headers) —
- * reuses the two brand colors already in globals.css rather than inventing
- * new ones. Everything other than SPARTA27 defaults to the main DTM accent.
+ * and SPARTA27 apart at a glance (day-countdown boxes, event card headers,
+ * action-item chips) — matches the Claude Design mockup's exact palette
+ * (SPARTA27's #7A5CF0 is a distinct purple, not the app's existing
+ * --violet-400). Everything other than SPARTA27 defaults to the main DTM
+ * accent.
  */
 export function eventAccentVar(event: EventName): string {
-  return event === "SPARTA 2027" ? "var(--violet-400)" : "var(--accent)";
+  // Literal hex (not var(--accent)) so callers can safely append a hex alpha
+  // suffix for a tinted chip background (e.g. `${color}16`) — see PortalShell.
+  return event === "SPARTA 2027" ? "#7A5CF0" : "#D4367A";
 }
+
+/** Neutral chip color for something that applies to every scoped event at once (no single event color fits) — matches the mockup's grey "BOTH" tag. */
+export const NEUTRAL_EVENT_COLOR = "#7A7A88";
 
 /**
  * One event's card on the Overview tab — a partner sponsoring both DTM27 and
@@ -75,8 +82,10 @@ export interface UpcomingActionItem {
   date: string;
   daysAway: number;
   hard: boolean;
-  /** Short event label(s) this deadline applies to, e.g. "DTM27" or "DTM27 & SPARTA27" — reflects ScheduledDeadline.events, not a guess. */
+  /** Short event label this deadline applies to, e.g. "DTM27" — or "BOTH" when it spans every scoped event. Reflects ScheduledDeadline.events, not a guess. */
   eventTag: string;
+  /** Matches eventTag: that event's accent color, or NEUTRAL_EVENT_COLOR for "BOTH". */
+  chipColor: string;
 }
 
 export interface KeyDateRow {
@@ -390,7 +399,8 @@ export function buildPortalView(
       date: d.date,
       daysAway: daysUntil(d.date),
       hard: d.hard,
-      eventTag: d.events.map((e) => (e === "SPARTA 2027" ? "SPARTA27" : e)).join(" & "),
+      eventTag: d.events.length > 1 ? "BOTH" : d.events[0] === "SPARTA 2027" ? "SPARTA27" : d.events[0],
+      chipColor: d.events.length > 1 ? NEUTRAL_EVENT_COLOR : eventAccentVar(d.events[0]),
     }));
 
   const keyDates: KeyDateRow[] = [

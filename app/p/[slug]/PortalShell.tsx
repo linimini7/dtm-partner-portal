@@ -283,18 +283,24 @@ export default function PortalShell({
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
-          <div className="border border-dtm-hairline rounded-[10px] p-3.5 flex flex-col gap-2.5">
+          <div
+            className="rounded-[10px] p-3.5 flex flex-col gap-3"
+            style={{ border: "1px solid var(--dtm-hairline)", background: "var(--dtm-surface)" }}
+          >
             <div className="eyebrow">Your DTM team</div>
             {salesLead && (
               <div className="flex flex-col gap-0.5">
-                <div className="text-[13px] font-medium text-fg-1">{salesLead.name}</div>
-                <div className="text-[11.5px] text-fg-4">Partnership · {salesLead.email}</div>
+                <div className="text-[12.5px] font-medium text-fg-2">{salesLead.name}</div>
+                <div className="text-[11px] text-fg-4">Partnership</div>
+                <a href={`mailto:${salesLead.email}`} className="font-mono text-[10.5px] break-all">
+                  {salesLead.email}
+                </a>
               </div>
             )}
             {dtmContacts.map((c) => (
               <div key={c.id} className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <div className="text-[13px] font-medium text-fg-1">{c.name}</div>
+                  <div className="text-[12.5px] font-medium text-fg-2">{c.name}</div>
                   {c.status && (
                     <span
                       className="rounded-[var(--radius-tag)] border px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.06em]"
@@ -304,10 +310,13 @@ export default function PortalShell({
                     </span>
                   )}
                 </div>
-                <div className="text-[11.5px] text-fg-4">
-                  {[c.role, c.email].filter(Boolean).join(" · ")}
-                </div>
-                {c.phone && <div className="text-[11.5px] text-fg-4">{c.phone}</div>}
+                {c.role && <div className="text-[11px] text-fg-4">{c.role}</div>}
+                {c.email && (
+                  <a href={`mailto:${c.email}`} className="font-mono text-[10.5px] break-all">
+                    {c.email}
+                  </a>
+                )}
+                {c.phone && <div className="text-[11px] text-fg-4">{c.phone}</div>}
               </div>
             ))}
             <div className="pt-1.5 text-[11px] text-fg-5" style={{ borderTop: "1px solid var(--dtm-hairline)" }}>
@@ -389,50 +398,62 @@ export default function PortalShell({
           <div className="flex flex-col gap-5">
             {view.upcomingActionItems.length > 0 && (
               <div
-                className="rounded-[var(--radius-card)] p-6 flex flex-col gap-3.5"
-                style={{ border: "1px solid rgb(234 179 8 / 35%)", background: "rgb(234 179 8 / 6%)" }}
+                className="rounded-[13px] overflow-hidden flex flex-col"
+                style={{
+                  border: "1px solid rgb(224 163 62 / 30%)",
+                  background:
+                    "linear-gradient(180deg, rgb(224 163 62 / 8%), rgb(224 163 62 / 2%)), var(--dtm-surface)",
+                }}
               >
-                <div className="flex justify-between items-start gap-3 flex-wrap">
-                  <div>
-                    <div className="text-[15px] font-semibold text-fg-1">What we need from you</div>
-                    <div className="text-[12.5px] text-fg-4">
-                      {view.upcomingActionItems.length} open item
-                      {view.upcomingActionItems.length === 1 ? "" : "s"}. The rest of this portal
-                      is reference — this part is not.
+                <div
+                  className="flex justify-between items-center gap-3.5 flex-wrap p-[18px_22px]"
+                  style={{ borderBottom: "1px solid rgb(224 163 62 / 18%)" }}
+                >
+                  <div className="flex flex-col gap-[3px]">
+                    <div className="text-[16px] font-semibold tracking-[-0.015em] text-fg-1">
+                      What we need from you
+                    </div>
+                    <div className="text-[12.5px] text-fg-3">
+                      {view.upcomingActionItems.length === 1
+                        ? "One open item."
+                        : `${view.upcomingActionItems.length} open items${
+                            view.upcomingActionItems.length > 3 ? ", soonest three below." : "."
+                          }`}{" "}
+                      The rest of this portal is reference — this part is not.
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setTab("actions")}
-                    className="shrink-0 rounded-[8px] px-3 py-2 font-mono text-[10.5px] tracking-[0.1em] uppercase font-medium"
+                    className="shrink-0 rounded-[7px] px-[15px] py-[10px] font-mono text-[10px] tracking-[0.12em] uppercase"
                     style={{ background: "var(--warn)", color: "var(--dtm-ink)" }}
                   >
-                    All action items →
+                    {view.upcomingActionItems.length > 3
+                      ? `All ${view.upcomingActionItems.length} items →`
+                      : "All action items →"}
                   </button>
                 </div>
-                <div className="flex flex-col" style={{ borderTop: "1px solid rgb(234 179 8 / 20%)" }}>
-                  {view.upcomingActionItems.map((item) => (
+                <div className="flex flex-col">
+                  {view.upcomingActionItems.slice(0, 3).map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between gap-4 py-3"
-                      style={{ borderBottom: "1px solid rgb(234 179 8 / 20%)" }}
+                      className="flex items-center justify-between gap-4 flex-wrap p-[15px_22px]"
+                      style={{ borderBottom: "1px solid var(--dtm-surface-2)" }}
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0" style={{ flex: "1 1 280px" }}>
                         <div className="text-[13.5px] font-medium text-fg-1">{item.title}</div>
                       </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <Chip color="var(--fg-4)" bg="var(--dtm-surface-2)">
-                          {item.eventTag}
-                        </Chip>
-                        <div className="text-right">
-                          <div
-                            className="font-mono text-[12.5px]"
-                            style={{ color: item.hard ? "var(--alert)" : "var(--fg-2)" }}
-                          >
-                            {formatDate(item.date)}
-                          </div>
-                          <div className="text-[11px] text-fg-5">in {item.daysAway} days</div>
+                      <Chip color={item.chipColor} bg={`${item.chipColor}16`}>
+                        {item.eventTag}
+                      </Chip>
+                      <div className="flex flex-col gap-0.5 text-right shrink-0" style={{ minWidth: 92 }}>
+                        <div
+                          className="font-mono text-[12.5px] font-medium"
+                          style={{ color: item.daysAway <= 60 ? "var(--warn)" : "var(--fg-2)" }}
+                        >
+                          {formatDate(item.date)}
                         </div>
+                        <div className="text-[10.5px] text-fg-5">in {item.daysAway} days</div>
                       </div>
                     </div>
                   ))}
@@ -469,53 +490,55 @@ export default function PortalShell({
                   {view.eventSections.map((section) => (
                     <div
                       key={section.event}
-                      className="rounded-[var(--radius-card)] border overflow-hidden flex flex-col"
+                      className="rounded-[13px] overflow-hidden flex flex-col"
                       style={{
-                        borderLeft: `3px solid ${section.accentVar}`,
-                        borderTop: `1px solid color-mix(in srgb, ${section.accentVar} 30%, var(--dtm-hairline))`,
-                        borderRight: `1px solid var(--dtm-hairline)`,
-                        borderBottom: `1px solid var(--dtm-hairline)`,
-                        background: `radial-gradient(140% 90% at 0% 0%, color-mix(in srgb, ${section.accentVar} 16%, var(--dtm-surface)) 0%, var(--dtm-surface) 55%)`,
+                        border: `1px solid ${section.accentVar}2E`,
+                        background: "var(--dtm-surface)",
                       }}
                     >
-                      <div className="flex items-start justify-between gap-3 p-[18px_22px_0]">
-                        <div
-                          className="text-[16px] font-semibold"
-                          style={{ color: section.accentVar }}
-                        >
-                          {section.eventLabel}
-                        </div>
-                        {section.daysAway !== null && (
-                          <div className="text-right shrink-0">
+                      <div
+                        className="flex flex-col gap-3 p-[19px_20px]"
+                        style={{
+                          background: `linear-gradient(180deg, ${section.accentVar}14, ${section.accentVar}04)`,
+                          borderBottom: `1px solid ${section.accentVar}24`,
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div className="flex flex-col gap-[5px] min-w-0">
                             <div
-                              className="text-[28px] font-semibold leading-[1.1] tracking-[-0.03em]"
+                              className="text-[18px] font-bold tracking-[-0.025em]"
                               style={{ color: section.accentVar }}
                             >
-                              {section.daysAway}
+                              {section.eventLabel}
                             </div>
-                            <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-4">
-                              Days away
+                            <div className="text-[12.5px] text-fg-2 leading-[1.45]">{section.dateLine}</div>
+                            <div className="text-[12px] text-fg-4 leading-[1.45]">{section.location}</div>
+                          </div>
+                          {section.daysAway !== null && (
+                            <div className="flex flex-col gap-[3px] text-right shrink-0">
+                              <div
+                                className="text-[27px] font-bold leading-[1] tracking-[-0.035em]"
+                                style={{ color: section.accentVar }}
+                              >
+                                {section.daysAway}
+                              </div>
+                              <div className="font-mono text-[9px] uppercase tracking-[0.13em] text-fg-4">
+                                Days away
+                              </div>
                             </div>
+                          )}
+                        </div>
+                        {section.context && (
+                          <div
+                            className="text-[12.5px] text-fg-3 leading-[1.55] pt-[11px]"
+                            style={{ borderTop: "1px solid var(--dtm-hairline)" }}
+                          >
+                            {section.context}
                           </div>
                         )}
                       </div>
-                      <div
-                        className="flex flex-col gap-2 px-[22px] pt-2 pb-[18px] text-[13px] text-fg-2"
-                        style={{ borderBottom: "1px solid var(--dtm-hairline)" }}
-                      >
-                        <div>{section.dateLine}</div>
-                        <div>{section.location}</div>
-                      </div>
-                      {section.context && (
-                        <div
-                          className="px-[22px] py-[16px] text-[13px] text-fg-3 leading-[1.6]"
-                          style={{ borderBottom: "1px solid var(--dtm-hairline)" }}
-                        >
-                          {section.context}
-                        </div>
-                      )}
-                      <div className="px-[22px] py-[16px] flex flex-col gap-1" style={{ borderBottom: "1px solid var(--dtm-hairline)" }}>
-                        <div className="eyebrow mb-1">What you get</div>
+                      <div className="flex flex-col gap-[11px] p-[18px_20px]">
+                        <div className="eyebrow">What you get</div>
                         {section.glanceRows.length === 0 ? (
                           <div className="text-[12.5px] text-fg-4">
                             Deliverables not yet exploded in Attio.
@@ -524,8 +547,8 @@ export default function PortalShell({
                           section.glanceRows.map((row) => <KV key={row.label} {...row} />)
                         )}
                       </div>
-                      <div className="px-[22px] py-[16px] flex flex-col gap-1">
-                        <div className="eyebrow mb-1">Practical</div>
+                      <div className="flex flex-col gap-[9px] p-[4px_20px_18px]">
+                        <div className="eyebrow">Practical</div>
                         {section.practicalLinks.map((row, j) => (
                           <KV key={row.label + j} {...row} />
                         ))}
@@ -549,12 +572,12 @@ export default function PortalShell({
                   >
                     <Card
                       style={{
-                        border: "1px solid color-mix(in srgb, var(--ok) 35%, transparent)",
-                        background: "radial-gradient(140% 90% at 0% 0%, color-mix(in srgb, var(--ok) 12%, var(--dtm-surface)) 0%, var(--dtm-surface) 55%)",
+                        border: "1px solid rgb(79 169 122 / 28%)",
+                        background: "linear-gradient(180deg, rgb(79 169 122 / 7%), rgb(79 169 122 / 1.5%)), var(--dtm-surface)",
                       }}
                     >
                       <div className="flex justify-between items-start gap-2.5">
-                        <div className="text-[15px] font-semibold text-fg-1">
+                        <div className="text-[16px] font-semibold tracking-[-0.015em] text-fg-1">
                           Become a Guardian Catalyst Partner
                         </div>
                         <Chip color="var(--ok)">Rolling</Chip>
@@ -566,13 +589,13 @@ export default function PortalShell({
                         complimentary ticket to DTM.
                       </div>
                       <div
-                        className="rounded-[9px] p-3.5 flex flex-col gap-2.5"
-                        style={{ border: "1px solid var(--dtm-hairline)", background: "var(--dtm-ink-2)" }}
+                        className="rounded-[10px] p-4 flex flex-col gap-[13px]"
+                        style={{ border: "1px solid #1F1F27", background: "var(--dtm-ink)" }}
                       >
-                        <div className="flex justify-between items-center gap-2.5">
+                        <div className="flex justify-between items-baseline gap-2.5">
                           <div className="eyebrow">Nominated Guardians</div>
-                          <div className="font-mono text-[13px] text-fg-2">
-                            {guardianNomineeCount} / {GUARDIAN_TARGET}
+                          <div className="font-mono text-[13px] text-fg-1">
+                            {guardianNomineeCount} <span className="text-[#5A5A66]">/ {GUARDIAN_TARGET}</span>
                           </div>
                         </div>
                         <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "var(--dtm-hairline)" }}>
@@ -581,13 +604,13 @@ export default function PortalShell({
                             style={{ width: `${guardianProgressPct}%`, background: "var(--ok)" }}
                           />
                         </div>
-                        <div className="text-[13px] text-fg-1">
-                          At 15 confirmed you unlock <strong>4 curated 1:1 meetings</strong> and
-                          branding as a{" "}
-                          <strong style={{ color: "var(--ok)" }}>Guardian Catalyst Partner</strong>.
+                        <div className="text-[12.5px] text-fg-2 leading-[1.55]">
+                          At 15 confirmed you unlock{" "}
+                          <strong className="text-fg-1">4 curated 1:1 meetings</strong> and branding
+                          as a <strong style={{ color: "var(--ok)" }}>Guardian Catalyst Partner</strong>.
                         </div>
                       </div>
-                      <div className="text-[12.5px] text-fg-4 leading-[1.55]">
+                      <div className="text-[12px] text-fg-4 leading-[1.55]">
                         Guardians take time to confirm, so the earlier you nominate the better.
                         Someone from the DTM team will walk you through the programme.
                       </div>
@@ -604,10 +627,10 @@ export default function PortalShell({
                     {view.hasMeet && (
                       <Card>
                         <div className="flex justify-between items-start gap-2.5">
-                          <div className="text-[15px] font-semibold text-fg-1">
+                          <div className="text-[16px] font-semibold tracking-[-0.015em] text-fg-1">
                             Who do you want to meet{view.eventLabel ? ` at ${view.eventLabel}` : ""}?
                           </div>
-                          <Chip color="var(--fg-5)" bg="var(--dtm-surface-2)">
+                          <Chip color="#7A7A88" bg="#16161C">
                             Form coming soon
                           </Chip>
                         </div>
