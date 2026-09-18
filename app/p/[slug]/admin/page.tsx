@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getPortalBySlug } from "@/lib/data";
-import { getMediaKit, mediaKitEventSlug, type MediaKitEvent } from "@/lib/portal-content";
-import { getEmailDerivedContact } from "@/lib/brand-assets";
+import { getEffectivePortalContent, getMediaKit, mediaKitEventSlug, type MediaKitEvent } from "@/lib/portal-content";
+import { getEmailDerivedContact, getPartnerContactPhone } from "@/lib/brand-assets";
 import { getPortalCode } from "@/lib/portal-code";
 import { getTicketCodes } from "@/lib/ticket-codes";
 import { buildPortalView } from "@/lib/portal-view";
@@ -22,10 +22,12 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
   const code = getPortalCode(slug);
   const mediaKit = await getMediaKit(slug);
   const emailContact = portal.poc ? null : await getEmailDerivedContact(slug);
+  const contactPhone = await getPartnerContactPhone(slug);
   const mediaKitEvents = portal.events.filter(
     (e): e is MediaKitEvent => e === "DTM27" || e === "SPARTA 2027",
   );
-  const view = buildPortalView(portal);
+  const portalContent = await getEffectivePortalContent(slug);
+  const view = buildPortalView(portal, portalContent);
   const ticketCodes = await getTicketCodes(slug);
   const ticketDeliverableIds = view.ticketItems.map((d) => d.id);
   const updateTicketCodesAction = updateTicketCodes.bind(null, slug, ticketDeliverableIds);
@@ -101,6 +103,11 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
                 {portal.poc.email}
               </a>
             )}
+            {contactPhone && (
+              <a href={`tel:${contactPhone}`} className="text-sm">
+                {contactPhone}
+              </a>
+            )}
           </div>
         ) : emailContact ? (
           <div className="flex flex-col gap-0.5">
@@ -108,6 +115,11 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
             <a href={`mailto:${emailContact.email}`} className="text-sm">
               {emailContact.email}
             </a>
+            {contactPhone && (
+              <a href={`tel:${contactPhone}`} className="text-sm">
+                {contactPhone}
+              </a>
+            )}
             <p className="mt-1 text-xs text-fg-5">
               Picked up automatically from an email — not set on Attio&apos;s CS Tracker entry.
             </p>
@@ -116,6 +128,12 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
           <p className="text-sm text-fg-4">
             No PoC set on the CS Tracker entry yet — set the &quot;PoC&quot; field on this
             company&apos;s CS Tracker entry in Attio.
+          </p>
+        )}
+        {!contactPhone && (portal.poc || emailContact) && (
+          <p className="mt-2 text-xs text-fg-5">
+            No phone on file — the partner (or you, on their portal) can add one under
+            &quot;Point of contact.&quot;
           </p>
         )}
       </div>

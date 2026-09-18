@@ -38,7 +38,7 @@ export const EVENT_INFO: Partial<
       context?: string;
       /** Event's own site — falls back to the main deeptech.build domain where no dedicated page is confirmed. */
       website: string;
-      /** Whether a floor plan is a relevant quick link for this event (only DTM27 has an exhibition floor). */
+      /** Whether a floor plan is a relevant quick link for this event. Both DTM27 and SPARTA27 have one; the actual URL is staff-editable (see lib/portal-content.ts's floorPlanUrls, set on Global portal settings), not hardcoded here. */
       hasFloorPlan?: boolean;
     }
   >
@@ -57,5 +57,6 @@ export const EVENT_INFO: Partial<
     startDate: "2027-02-11",
     context: "Official side event of the Munich Security Conference, co-organised with TUM Venture Labs.",
     website: "https://www.deeptech.build/sparta",
+    hasFloorPlan: true,
   },
 };

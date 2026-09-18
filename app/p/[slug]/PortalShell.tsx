@@ -7,17 +7,14 @@ import { workstreamDisplayName, type PortalView, type TabId } from "@/lib/portal
 import type { PortalContentFields } from "@/lib/portal-content";
 import { mediaKitEventSlug, type EventMediaKit, type MediaKitEvent } from "@/lib/media-kit";
 import type { BrandAssets } from "@/lib/brand-assets";
+import type { DtmContact } from "@/lib/dtm-contacts";
 import BrandAssetsCard from "./BrandAssetsCard";
 import ObligationLinksEditor from "./ObligationLinksEditor";
 import NomineeEditor from "./NomineeEditor";
-import PartnerContactEditor from "./PartnerContactEditor";
+import PartnerContactsCard from "./PartnerContactsCard";
 import MoatIntroForm from "./MoatIntroForm";
 import { toggleObligationChecked } from "./brand-actions";
 import { isNomineeObligation, type Nominee } from "@/lib/obligation-shared";
-
-// Partners are always directed to this shared inbox for customer success,
-// never to the individual CS lead's own address.
-const CUSTOMER_SUCCESS_EMAIL = "partnerships@deeptech.build";
 
 function Card({
   children,
@@ -80,6 +77,16 @@ function CopyTextButton({ text }: { text: string }) {
   );
 }
 
+const SHORT_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/** "2027-02-09" -> "9 Feb 2027" — a fixed 3-letter month abbreviation, since Intl's "short" style inconsistently returns "Sept" instead of "Sep" depending on the runtime's ICU data. */
+function formatDate(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  return `${day} ${SHORT_MONTHS[month - 1]} ${year}`;
+}
+
 function Chip({ children, color, bg }: { children: React.ReactNode; color: string; bg?: string }) {
   return (
     <span
@@ -140,6 +147,7 @@ export default function PortalShell({
   view,
   salesLead,
   partnerContact,
+  secondPartnerContact,
   isStaff,
   portalContent,
   mediaKit,
@@ -148,12 +156,15 @@ export default function PortalShell({
   announceLinks,
   nomineesByObligation,
   ticketCodes,
+  dtmContacts,
   slug,
 }: {
   view: PortalView;
   salesLead?: { name: string; email: string };
-  /** This partner's own point of contact — from Attio's CS Tracker "poc" field if staff set one, else whoever we've seen emailing in as this partner (see lib/email-ingestion.ts). Shown back to the partner themselves, so no reason to keep it staff-only the way admin/page.tsx does with the Attio source. */
-  partnerContact?: { name: string | null; email: string | null } | null;
+  /** This partner's own point of contact — from Attio's CS Tracker "poc" field if staff set one, else whoever we've seen emailing in as this partner (see lib/email-ingestion.ts). Shown back to the partner themselves, so no reason to keep it staff-only the way admin/page.tsx does with the Attio source. Phone has no Attio equivalent — always sourced from portal_content (see lib/brand-assets.ts's getPartnerContactPhone). */
+  partnerContact?: { name: string | null; email: string | null; phone: string | null } | null;
+  /** An optional second contact a partner can nominate themselves — for when the contract signatory isn't who's actually reachable day-to-day. Portal-local only, no Attio equivalent. */
+  secondPartnerContact?: { name: string | null; email: string | null; phone: string | null } | null;
   isStaff: boolean;
   portalContent: PortalContentFields;
   mediaKit: Record<MediaKitEvent, EventMediaKit>;
@@ -166,6 +177,8 @@ export default function PortalShell({
   nomineesByObligation: Record<string, Nominee[]>;
   /** Redemption code per ticket deliverable id, set by staff on /admin — see lib/ticket-codes.ts. */
   ticketCodes: Record<string, string>;
+  /** DTM-side people shown to every partner (name/role/email/phone, plus an optional status like "On maternal leave") — staff-managed on Global portal settings, see lib/dtm-contacts.ts. */
+  dtmContacts: DtmContact[];
   slug: string;
 }) {
   const [tab, setTab] = useState<TabId>("overview");
@@ -193,6 +206,20 @@ export default function PortalShell({
   const phases = Array.from(new Set(view.deliverableChecklist.map((a) => a.phase)));
   const visibleChecklist =
     filter === "All" ? view.deliverableChecklist : view.deliverableChecklist.filter((a) => a.phase === filter);
+
+  // Real, persisted nominee count (see NomineeEditor) — labeled "nominated"
+  // rather than "confirmed" since confirmation happens later, outside the
+  // portal, and isn't tracked anywhere yet.
+  const guardianNomineeCount = nomineesByObligation["guardians"]?.length ?? 0;
+  const GUARDIAN_TARGET = 15;
+  const guardianProgressPct = Math.min(100, Math.round((guardianNomineeCount / GUARDIAN_TARGET) * 100));
+
+  // The one scheduled deadline (if any) that's actually about confirming
+  // 1:1 meetings for this partner's scoped event(s) — real data, not a
+  // fabricated date; the row is simply omitted when none applies.
+  const confirmMeetingsDeadline = view.keyDates.find(
+    (d) => /confirm/i.test(d.what) && /(1:1|opt-in|meeting)/i.test(d.what),
+  );
 
   return (
     <div
@@ -256,39 +283,38 @@ export default function PortalShell({
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
-          <div className="border border-dtm-hairline rounded-[10px] p-3.5 flex flex-col gap-0.5">
-            <div className="eyebrow">Point of contact</div>
-            {partnerContact ? (
-              <>
-                <div className="text-[13px] font-medium text-fg-1">
-                  {partnerContact.name ?? partnerContact.email}
-                </div>
-                {partnerContact.email && (
-                  <div className="text-[11.5px] text-fg-4">{partnerContact.email}</div>
-                )}
-              </>
-            ) : (
-              <div className="text-[11.5px] text-fg-4">Not set yet</div>
-            )}
-            <PartnerContactEditor
-              slug={slug}
-              initialName={partnerContact?.name ?? ""}
-              initialEmail={partnerContact?.email ?? ""}
-            />
-          </div>
           <div className="border border-dtm-hairline rounded-[10px] p-3.5 flex flex-col gap-2.5">
-            <div className="eyebrow">Your point of contact</div>
-            <div className="flex flex-col gap-0.5">
-              <div className="text-[13px] font-medium text-fg-1">DTM Team</div>
-              <div className="text-[11.5px] text-fg-4">Customer success · {CUSTOMER_SUCCESS_EMAIL}</div>
-            </div>
+            <div className="eyebrow">Your DTM team</div>
             {salesLead && (
               <div className="flex flex-col gap-0.5">
                 <div className="text-[13px] font-medium text-fg-1">{salesLead.name}</div>
                 <div className="text-[11.5px] text-fg-4">Partnership · {salesLead.email}</div>
               </div>
             )}
+            {dtmContacts.map((c) => (
+              <div key={c.id} className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="text-[13px] font-medium text-fg-1">{c.name}</div>
+                  {c.status && (
+                    <span
+                      className="rounded-[var(--radius-tag)] border px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.06em]"
+                      style={{ borderColor: "var(--warn)", color: "var(--warn)" }}
+                    >
+                      {c.status}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11.5px] text-fg-4">
+                  {[c.role, c.email].filter(Boolean).join(" · ")}
+                </div>
+                {c.phone && <div className="text-[11.5px] text-fg-4">{c.phone}</div>}
+              </div>
+            ))}
+            <div className="pt-1.5 text-[11px] text-fg-5" style={{ borderTop: "1px solid var(--dtm-hairline)" }}>
+              Anything urgent, call rather than email.
+            </div>
           </div>
+          <PartnerContactsCard slug={slug} primary={partnerContact ?? null} secondary={secondPartnerContact ?? null} />
         </div>
       </aside>
 
@@ -300,16 +326,59 @@ export default function PortalShell({
                 {view.companyName} × Deep Tech Momentum
               </h1>
             </div>
-            <div className="max-w-[640px] text-[13px] text-fg-4">{view.headerSubtitle}</div>
+            <div className="flex items-center gap-2.5 flex-wrap text-[13px] text-fg-4">
+              <span>
+                {view.contractLink
+                  ? `Contract signed ${view.contractSignedDate ? formatDate(view.contractSignedDate) : "date not recorded"}`
+                  : "No contract on file."}
+              </span>
+              {view.contractLink && (
+                <a
+                  href={view.contractLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-[11px] tracking-[0.1em] uppercase whitespace-nowrap"
+                >
+                  View agreement ↗
+                </a>
+              )}
+            </div>
           </div>
-          {view.daysToEvents.length > 0 && (
-            <div className="ml-auto flex gap-8">
-              {view.daysToEvents.map((d) => (
-                <div key={d.label} className="text-right">
-                  <div className="eyebrow">{d.label}</div>
-                  <div className="text-[30px] font-semibold tracking-[-0.03em] leading-[1.1] text-fg-1">
-                    {d.value}
+          {view.eventSections.length > 0 && (
+            <div className="ml-auto flex gap-3 flex-wrap">
+              {view.eventSections.map((section) => (
+                <div
+                  key={section.event}
+                  className="rounded-[10px] px-4 py-3 min-w-[150px]"
+                  style={{
+                    border: `1px solid color-mix(in srgb, ${section.accentVar} 35%, transparent)`,
+                    background: `color-mix(in srgb, ${section.accentVar} 8%, var(--dtm-surface))`,
+                  }}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="h-1.5 w-1.5 rounded-full shrink-0"
+                      style={{ background: section.accentVar }}
+                    />
+                    <span
+                      className="font-mono text-[10px] tracking-[0.1em] uppercase"
+                      style={{ color: section.accentVar }}
+                    >
+                      {section.eventLabel}
+                    </span>
                   </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span
+                      className="text-[26px] font-semibold tracking-[-0.03em] leading-[1.15]"
+                      style={{ color: section.accentVar }}
+                    >
+                      {section.daysAway}
+                    </span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-fg-4">
+                      days
+                    </span>
+                  </div>
+                  <div className="text-[11.5px] text-fg-4">{section.shortDate}</div>
                 </div>
               ))}
             </div>
@@ -318,22 +387,58 @@ export default function PortalShell({
 
         {tab === "overview" && (
           <div className="flex flex-col gap-5">
-            <div
-              className="rounded-[var(--radius-card)] p-6 flex flex-col gap-3"
-              style={{
-                border: "1px solid rgb(212 54 122 / 28%)",
-                background:
-                  "linear-gradient(180deg, rgb(212 54 122 / 10%), rgb(212 54 122 / 3%))",
-              }}
-            >
-              <div className="text-[18px] font-semibold text-fg-1">
-                Welcome to your Deep Tech Momentum partner portal
+            {view.upcomingActionItems.length > 0 && (
+              <div
+                className="rounded-[var(--radius-card)] p-6 flex flex-col gap-3.5"
+                style={{ border: "1px solid rgb(234 179 8 / 35%)", background: "rgb(234 179 8 / 6%)" }}
+              >
+                <div className="flex justify-between items-start gap-3 flex-wrap">
+                  <div>
+                    <div className="text-[15px] font-semibold text-fg-1">What we need from you</div>
+                    <div className="text-[12.5px] text-fg-4">
+                      {view.upcomingActionItems.length} open item
+                      {view.upcomingActionItems.length === 1 ? "" : "s"}. The rest of this portal
+                      is reference — this part is not.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTab("actions")}
+                    className="shrink-0 rounded-[8px] px-3 py-2 font-mono text-[10.5px] tracking-[0.1em] uppercase font-medium"
+                    style={{ background: "var(--warn)", color: "var(--dtm-ink)" }}
+                  >
+                    All action items →
+                  </button>
+                </div>
+                <div className="flex flex-col" style={{ borderTop: "1px solid rgb(234 179 8 / 20%)" }}>
+                  {view.upcomingActionItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between gap-4 py-3"
+                      style={{ borderBottom: "1px solid rgb(234 179 8 / 20%)" }}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-[13.5px] font-medium text-fg-1">{item.title}</div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <Chip color="var(--fg-4)" bg="var(--dtm-surface-2)">
+                          {item.eventTag}
+                        </Chip>
+                        <div className="text-right">
+                          <div
+                            className="font-mono text-[12.5px]"
+                            style={{ color: item.hard ? "var(--alert)" : "var(--fg-2)" }}
+                          >
+                            {formatDate(item.date)}
+                          </div>
+                          <div className="text-[11px] text-fg-5">in {item.daysAway} days</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="text-sm text-fg-2 leading-[1.6] whitespace-nowrap">
-                Everything you need to know about our partnership lives here. This portal is
-                updated on a rolling basis — we will email you whenever something new lands.
-              </div>
-            </div>
+            )}
 
             {view.eventSections.length === 0 ? (
               <div className="grid gap-[18px] items-start" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
@@ -347,41 +452,80 @@ export default function PortalShell({
                 </Card>
               </div>
             ) : (
-              view.eventSections.map((section, i) => (
-                <div key={section.eventLabel} className="flex flex-col gap-5">
-                  {i > 0 && <div className="border-t border-dtm-hairline" />}
-                  <div
-                    className="grid gap-[18px] items-start"
-                    style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}
-                  >
-                    <Card>
-                      <div className="text-[15px] font-semibold text-fg-1">
-                        Quick links for {section.eventLabel}
-                      </div>
-                      {section.quickLinks.map((row, j) => (
-                        <KV key={row.label + j} {...row} />
-                      ))}
-                    </Card>
-
-                    <Card>
-                      <div className="text-[15px] font-semibold text-fg-1">
-                        Your {section.eventLabel} partnership at a glance
-                      </div>
-                      <div className="text-[12.5px] text-fg-4 leading-[1.55]">
-                        Generated from your contracted deliverables. If anything here does not
-                        match your understanding, tell us straight away.
-                      </div>
-                      {section.glanceRows.length === 0 ? (
-                        <div className="text-[12.5px] text-fg-4">
-                          Deliverables not yet exploded in Attio.
-                        </div>
-                      ) : (
-                        section.glanceRows.map((row) => <KV key={row.label} {...row} />)
-                      )}
-                    </Card>
+              <div className="flex flex-col gap-3.5">
+                <div>
+                  <div className="text-[17px] font-semibold text-fg-1">
+                    Your {view.eventSections.length > 1 ? "two events" : "event"}
+                  </div>
+                  <div className="text-[12.5px] text-fg-4">
+                    Generated from your contracted deliverables. If anything here does not match
+                    your understanding, tell us straight away.
                   </div>
                 </div>
-              ))
+                <div
+                  className="grid gap-[18px] items-start"
+                  style={{ gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))" }}
+                >
+                  {view.eventSections.map((section) => (
+                    <div
+                      key={section.event}
+                      className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface overflow-hidden flex flex-col"
+                      style={{ borderLeft: `3px solid ${section.accentVar}` }}
+                    >
+                      <div className="flex items-center justify-between gap-3 p-[18px_22px]">
+                        <div
+                          className="text-[16px] font-semibold"
+                          style={{ color: section.accentVar }}
+                        >
+                          {section.eventLabel}
+                        </div>
+                        {section.daysAway !== null && (
+                          <div
+                            className="text-[13px] font-semibold"
+                            style={{ color: section.accentVar }}
+                          >
+                            {section.daysAway} days away
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2 px-[22px] pb-[18px] text-[13px] text-fg-2">
+                        <div>{section.dateLine}</div>
+                        <div>{section.location}</div>
+                      </div>
+                      {section.context && (
+                        <div
+                          className="px-[22px] py-[16px] text-[13px] text-fg-3 leading-[1.6]"
+                          style={{ borderTop: "1px solid var(--dtm-hairline)" }}
+                        >
+                          {section.context}
+                        </div>
+                      )}
+                      <div
+                        className="px-[22px] py-[16px] flex flex-col gap-1"
+                        style={{ borderTop: "1px solid var(--dtm-hairline)" }}
+                      >
+                        <div className="eyebrow mb-1">What you get</div>
+                        {section.glanceRows.length === 0 ? (
+                          <div className="text-[12.5px] text-fg-4">
+                            Deliverables not yet exploded in Attio.
+                          </div>
+                        ) : (
+                          section.glanceRows.map((row) => <KV key={row.label} {...row} />)
+                        )}
+                      </div>
+                      <div
+                        className="px-[22px] py-[16px] flex flex-col gap-1"
+                        style={{ borderTop: "1px solid var(--dtm-hairline)" }}
+                      >
+                        <div className="eyebrow mb-1">Practical</div>
+                        {section.practicalLinks.map((row, j) => (
+                          <KV key={row.label + j} {...row} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {view.hasGuardian && (
@@ -396,8 +540,11 @@ export default function PortalShell({
                     style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}
                   >
                     <Card>
-                      <div className="text-[15px] font-semibold text-fg-1">
-                        Become a Guardian Catalyst Partner
+                      <div className="flex justify-between items-start gap-2.5">
+                        <div className="text-[15px] font-semibold text-fg-1">
+                          Become a Guardian Catalyst Partner
+                        </div>
+                        <Chip color="var(--ok)">Rolling</Chip>
                       </div>
                       <div className="text-[13px] text-fg-3 leading-[1.6]">
                         The Guardians of European Deep Tech is an invite-only cohort of
@@ -409,17 +556,23 @@ export default function PortalShell({
                         className="rounded-[9px] p-3.5 flex flex-col gap-2.5"
                         style={{ border: "1px solid var(--dtm-hairline)", background: "var(--dtm-ink-2)" }}
                       >
-                        <div className="text-[13px] text-fg-1">
-                          Once <strong>15 Guardians co-invited by you are confirmed</strong> to
-                          attend, you will receive:
+                        <div className="flex justify-between items-center gap-2.5">
+                          <div className="eyebrow">Nominated Guardians</div>
+                          <div className="font-mono text-[13px] text-fg-2">
+                            {guardianNomineeCount} / {GUARDIAN_TARGET}
+                          </div>
                         </div>
-                        <ul className="flex flex-col gap-1.5 pl-4 list-disc text-[13px] text-fg-2">
-                          <li>4 highly curated 1:1 pre-scheduled meetings (subject to double opt-in)</li>
-                          <li>
-                            Exclusive branding as a{" "}
-                            <strong style={{ color: "var(--accent)" }}>Guardian Catalyst Partner</strong>
-                          </li>
-                        </ul>
+                        <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "var(--dtm-hairline)" }}>
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${guardianProgressPct}%`, background: "var(--ok)" }}
+                          />
+                        </div>
+                        <div className="text-[13px] text-fg-1">
+                          At 15 confirmed you unlock <strong>4 curated 1:1 meetings</strong> and
+                          branding as a{" "}
+                          <strong style={{ color: "var(--ok)" }}>Guardian Catalyst Partner</strong>.
+                        </div>
                       </div>
                       <div className="text-[12.5px] text-fg-4 leading-[1.55]">
                         Guardians take time to confirm, so the earlier you nominate the better.
@@ -437,17 +590,29 @@ export default function PortalShell({
 
                     {view.hasMeet && (
                       <Card>
-                        <div className="text-[15px] font-semibold text-fg-1">
-                          Who do you want to meet{view.eventLabel ? ` at ${view.eventLabel}` : ""}?
+                        <div className="flex justify-between items-start gap-2.5">
+                          <div className="text-[15px] font-semibold text-fg-1">
+                            Who do you want to meet{view.eventLabel ? ` at ${view.eventLabel}` : ""}?
+                          </div>
+                          <Chip color="var(--fg-5)" bg="var(--dtm-surface-2)">
+                            Form coming soon
+                          </Chip>
                         </div>
                         <div className="text-[13px] text-fg-3 leading-[1.6]">
                           We curate meetings around what you tell us. Let us know who you want to
                           meet and what your search fields are.
                         </div>
+                        <div>
+                          <KV
+                            label="Curated 1:1s in your package"
+                            values={[view.matchmakingItems.map((d) => d.name).join(", ") || "Not yet exploded in Attio"]}
+                          />
+                          {confirmMeetingsDeadline && (
+                            <KV label="You confirm your picks by" values={[formatDate(confirmMeetingsDeadline.date)]} />
+                          )}
+                          <KV label="Curation runs" values={["Final two weeks"]} />
+                        </div>
                         <div className="text-[12.5px] text-fg-4 leading-[1.55]">
-                          <Chip color="var(--fg-5)" bg="var(--dtm-surface-2)">
-                            Form coming soon
-                          </Chip>{" "}
                           In the meantime, reply to your point of contact with the companies,
                           roles and markets you are targeting.
                         </div>
@@ -751,29 +916,6 @@ export default function PortalShell({
                     coming — names can be transferred later.
                   </div>
                 )}
-              </Card>
-
-              <Card>
-                <div className="flex justify-between items-center gap-2.5">
-                  <div>
-                    <div className="text-[15px] font-semibold text-fg-1">Your contract</div>
-                    <div className="text-[12.5px] text-fg-4">
-                      {view.contractLink
-                        ? `Signed ${view.contractSignedDate ?? "date not recorded"}`
-                        : "No contract on file."}
-                    </div>
-                  </div>
-                  {view.contractLink && (
-                    <a
-                      href={view.contractLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-mono text-[11px] tracking-[0.1em] uppercase whitespace-nowrap"
-                    >
-                      Open ↗
-                    </a>
-                  )}
-                </div>
               </Card>
 
               <Card>

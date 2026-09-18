@@ -99,7 +99,7 @@ function CopyCode({ code }: { code: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="rounded-[var(--radius-chip)] border border-dtm-hairline bg-dtm-ink px-2 py-1 font-mono text-xs"
+      className="rounded-[var(--radius-chip)] border border-dtm-hairline bg-dtm-ink px-2 py-1 text-xs"
       title="Copy access code"
     >
       {copied ? "Copied!" : code}
@@ -369,7 +369,7 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
                     >
                       <span className="truncate">{c.label}</span>
                       {active && (
-                        <span className="flex shrink-0 items-center gap-0.5 font-mono text-[10px] text-fg-4">
+                        <span className="flex shrink-0 items-center gap-0.5 text-[10px] text-fg-4">
                           {sortKeys.length > 1 && <span>{sortIndex + 1}</span>}
                           <span>{active.direction === "asc" ? "▲" : "▼"}</span>
                         </span>
@@ -457,7 +457,7 @@ function Counter({
   return (
     <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-4">
       <p className="eyebrow">{label}</p>
-      <p className="mt-1 text-3xl font-mono" style={{ color }}>
+      <p className="mt-1 text-3xl" style={{ color }}>
         {value}
       </p>
       {note && <p className="mt-1 text-xs text-fg-4">{note}</p>}

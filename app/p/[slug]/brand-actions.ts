@@ -10,6 +10,7 @@ import {
   upsertBrandInfo,
   upsertBrandLogo,
   upsertPartnerContact,
+  upsertSecondPartnerContact,
 } from "@/lib/brand-assets";
 import { setObligationChecked, setObligationLinks, setObligationNominees } from "@/lib/obligation-checks";
 import type { Nominee } from "@/lib/obligation-shared";
@@ -213,12 +214,36 @@ export async function saveObligationNominees(
  * lib/brand-assets.ts's upsertPartnerContact) — surfaced to staff via the
  * activity log instead of silently taking effect when one already exists.
  */
-export async function updatePartnerContact(slug: string, name: string, email: string) {
+export async function updatePartnerContact(slug: string, name: string, email: string, phone: string) {
   const updatedBy = await requireWriteAccess(slug);
   const trimmedEmail = email.trim();
+  const trimmedPhone = phone.trim() || null;
   if (!trimmedEmail) throw new Error("An email address is required.");
-  await upsertPartnerContact(slug, name.trim() || null, trimmedEmail, updatedBy);
+  await upsertPartnerContact(slug, name.trim() || null, trimmedEmail, trimmedPhone, updatedBy);
   await logActivity(slug, updatedBy, `Proposed point of contact: ${name.trim() || trimmedEmail} <${trimmedEmail}>`);
+  revalidatePath(`/p/${slug}`);
+}
+
+/**
+ * A second, optional point of contact — some partners have one person who
+ * signed the contract and a different person who's actually reachable
+ * day-to-day, and want both listed. Unlike the primary contact, a blank
+ * email clears this slot rather than erroring, since having none set is a
+ * normal state here.
+ */
+export async function updateSecondPartnerContact(slug: string, name: string, email: string, phone: string) {
+  const updatedBy = await requireWriteAccess(slug);
+  const trimmedName = name.trim() || null;
+  const trimmedEmail = email.trim() || null;
+  const trimmedPhone = phone.trim() || null;
+  await upsertSecondPartnerContact(slug, trimmedName, trimmedEmail, trimmedPhone, updatedBy);
+  await logActivity(
+    slug,
+    updatedBy,
+    trimmedEmail
+      ? `Set an additional point of contact: ${trimmedName ?? trimmedEmail} <${trimmedEmail}>`
+      : "Cleared the additional point of contact",
+  );
   revalidatePath(`/p/${slug}`);
 }
 

@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getPortalBySlug, getStaffDirectory } from "@/lib/data";
 import { getEffectivePortalContent, getMediaKit } from "@/lib/portal-content";
-import { getBrandAssets, getEmailDerivedContact } from "@/lib/brand-assets";
+import { getBrandAssets, getEmailDerivedContact, getSecondPartnerContact } from "@/lib/brand-assets";
+import { listDtmContacts } from "@/lib/dtm-contacts";
 import { getCheckedObligationIds, getObligationLinks, getObligationNominees, isNomineeObligation, type Nominee } from "@/lib/obligation-checks";
 import { getTicketCodes } from "@/lib/ticket-codes";
 import { verifyPortalCode } from "@/lib/portal-code";
@@ -47,15 +48,20 @@ export default async function PortalPage({
 
   const staff = await getStaffDirectory();
   const salesLead = portal.salesLeadId ? staff[portal.salesLeadId] : undefined;
-  const view = buildPortalView(portal);
   const portalContent = await getEffectivePortalContent(slug);
+  const view = buildPortalView(portal, portalContent);
   const mediaKit = await getMediaKit(slug);
   const brandAssets = await getBrandAssets(slug);
   // Prefer a staff-confirmed Attio "poc" over whatever email-ingestion
-  // picked up on its own — same precedence admin/page.tsx uses.
+  // picked up on its own — same precedence admin/page.tsx uses. Phone has no
+  // Attio equivalent, so it's always sourced from portal_content regardless
+  // of which side supplied the name/email (see lib/brand-assets.ts).
+  const emailDerivedContact = await getEmailDerivedContact(slug);
   const partnerContact = portal.poc
-    ? { name: portal.poc.name, email: portal.poc.email }
-    : await getEmailDerivedContact(slug);
+    ? { name: portal.poc.name, email: portal.poc.email, phone: emailDerivedContact?.phone ?? null }
+    : emailDerivedContact;
+  const secondPartnerContact = await getSecondPartnerContact(slug);
+  const dtmContacts = await listDtmContacts();
   const checkedObligationIds = Array.from(await getCheckedObligationIds(slug));
   const announceLinks = await getObligationLinks(slug, "announce");
   const nomineeObligationIds = view.partnerObligations.map((o) => o.id).filter(isNomineeObligation);
@@ -71,6 +77,7 @@ export default async function PortalPage({
       view={view}
       salesLead={salesLead}
       partnerContact={partnerContact}
+      secondPartnerContact={secondPartnerContact}
       isStaff={Boolean(session)}
       portalContent={portalContent}
       mediaKit={mediaKit}
@@ -79,6 +86,7 @@ export default async function PortalPage({
       announceLinks={announceLinks}
       nomineesByObligation={nomineesByObligation}
       ticketCodes={ticketCodes}
+      dtmContacts={dtmContacts}
       slug={slug}
     />
   );

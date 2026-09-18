@@ -23,7 +23,14 @@
  */
 import { getPool } from "@/lib/db";
 import { listPartnerDomains } from "@/lib/attio";
-import { getBrandAssets, hasLogoWithHash, hashLogoBytes, upsertBrandLogo } from "@/lib/brand-assets";
+import {
+  getBrandAssets,
+  hasFlaggedAttachment,
+  hasLogoWithHash,
+  hashLogoBytes,
+  recordFlaggedAttachment,
+  upsertBrandLogo,
+} from "@/lib/brand-assets";
 import { extractImagesFromZip } from "@/lib/zip-images";
 import { logActivity } from "@/lib/activity-log";
 import {
@@ -49,6 +56,28 @@ const IMAGE_MIME_TYPES = new Set([
 ]);
 
 const ZIP_MIME_TYPES = new Set(["application/zip", "application/x-zip-compressed"]);
+
+/**
+ * Vector formats design/print agencies default to for logos, which nothing
+ * in this pipeline can rasterize (sharp handles pixels, not paths) — so
+ * these can't be auto-ingested the way a PNG can. Deliberately narrow (not
+ * every non-image attachment) so a partner emailing over a signed contract
+ * PDF doesn't get mistaken for a logo drop. Matched by extension since
+ * senders' mail clients often report .eps as generic
+ * application/octet-stream rather than a real vector MIME type.
+ */
+const UNSUPPORTED_LOGO_EXTENSIONS = new Map([
+  [".eps", "EPS"],
+  [".ai", "Illustrator (.ai)"],
+]);
+
+function unsupportedLogoFormat(filename: string): string | null {
+  const lower = filename.toLowerCase();
+  for (const [ext, label] of UNSUPPORTED_LOGO_EXTENSIONS) {
+    if (lower.endsWith(ext)) return label;
+  }
+  return null;
+}
 
 function domainOf(email: string): string {
   return email.split("@")[1]?.toLowerCase() ?? "";
@@ -88,6 +117,8 @@ export interface IngestionResult {
   messagesScanned: number;
   logosAdded: { slug: string; filename: string }[];
   contactsSet: { slug: string; email: string }[];
+  unsupportedLogosFlagged: { slug: string; filename: string; format: string }[];
+  contactMismatchesFlagged: { slug: string; email: string }[];
 }
 
 export async function ingestPartnerEmails(): Promise<IngestionResult> {
@@ -96,6 +127,8 @@ export async function ingestPartnerEmails(): Promise<IngestionResult> {
 
   const logosAdded: IngestionResult["logosAdded"] = [];
   const contactsSet: IngestionResult["contactsSet"] = [];
+  const unsupportedLogosFlagged: IngestionResult["unsupportedLogosFlagged"] = [];
+  const contactMismatchesFlagged: IngestionResult["contactMismatchesFlagged"] = [];
 
   for (const id of messageIds) {
     const message = await getMessage(id);
@@ -152,12 +185,33 @@ export async function ingestPartnerEmails(): Promise<IngestionResult> {
       }
     }
 
-    // ---- point of contact: fill in only if we don't already have one ----
-    const { rows } = await getPool().query<{ partner_contact_email: string | null }>(
-      "SELECT partner_contact_email FROM portal_content WHERE scope = $1",
-      [match.slug],
+    // ---- unsupported vector logos (.eps, .ai): can't be ingested, but shouldn't vanish silently ----
+    const unsupportedParts = allParts.filter(
+      (p) => p.filename && p.body?.attachmentId && isRealAttachment(p) && unsupportedLogoFormat(p.filename),
     );
-    if (!rows[0]?.partner_contact_email) {
+    for (const part of unsupportedParts) {
+      const format = unsupportedLogoFormat(part.filename!)!;
+      const bytes = await getAttachmentBytes(message.id, part.body!.attachmentId!);
+      const hash = hashLogoBytes(bytes);
+      if (await hasFlaggedAttachment(match.slug, hash)) continue;
+      await recordFlaggedAttachment(match.slug, hash, part.filename!, format);
+      unsupportedLogosFlagged.push({ slug: match.slug, filename: part.filename!, format });
+      await logActivity(
+        match.slug,
+        "email-ingestion",
+        `Logo arrived by email as a ${format} file (${part.filename}) — this format can't be auto-imported. Ask them to resend as PNG/SVG, or convert and upload it manually.`,
+      );
+    }
+
+    // ---- point of contact: fill in only if we don't already have one; otherwise flag a mismatch for review ----
+    const { rows } = await getPool().query<{
+      partner_contact_email: string | null;
+      partner_contact_2_email: string | null;
+    }>("SELECT partner_contact_email, partner_contact_2_email FROM portal_content WHERE scope = $1", [
+      match.slug,
+    ]);
+    const existingContact = rows[0]?.partner_contact_email;
+    if (!existingContact) {
       await getPool().query(
         `INSERT INTO portal_content (scope, partner_contact_name, partner_contact_email, partner_contact_source, updated_at, updated_by)
          VALUES ($1, $2, $3, 'email', now(), 'email-ingestion')
@@ -176,8 +230,35 @@ export async function ingestPartnerEmails(): Promise<IngestionResult> {
         "email-ingestion",
         `Point of contact detected from email: ${match.contactName ?? match.contactEmail} <${match.contactEmail}>`,
       );
+    } else {
+      // A different person than the one on file just emailed us. Reading
+      // the actual message to tell a real handoff ("X is now responsible
+      // for this") from a CC'd colleague or a signature mention needs
+      // judgment this pipeline doesn't have — so this only ever surfaces
+      // the mismatch for a human to decide, never overwrites the contact
+      // (local or Attio) on its own.
+      const knownEmails = new Set(
+        [existingContact, rows[0]?.partner_contact_2_email].filter((e): e is string => !!e).map((e) => e.toLowerCase()),
+      );
+      if (!knownEmails.has(match.contactEmail.toLowerCase())) {
+        const alreadyFlagged = await getPool().query(
+          `SELECT 1 FROM portal_activity_log
+           WHERE scope = $1 AND actor = 'email-ingestion'
+             AND description LIKE '%different contact than currently on file%<' || $2 || '>%'
+           LIMIT 1`,
+          [match.slug, match.contactEmail],
+        );
+        if (alreadyFlagged.rows.length === 0) {
+          contactMismatchesFlagged.push({ slug: match.slug, email: match.contactEmail });
+          await logActivity(
+            match.slug,
+            "email-ingestion",
+            `Email received from a different contact than currently on file: ${match.contactName ?? match.contactEmail} <${match.contactEmail}> (on file: ${existingContact}) — review whether the point of contact should change.`,
+          );
+        }
+      }
     }
   }
 
-  return { messagesScanned: messageIds.length, logosAdded, contactsSet };
+  return { messagesScanned: messageIds.length, logosAdded, contactsSet, unsupportedLogosFlagged, contactMismatchesFlagged };
 }

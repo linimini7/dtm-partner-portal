@@ -1,5 +1,6 @@
 import { CURRENT_CYCLE_EVENTS, EVENT_INFO, HARD_DEADLINE_DATES } from "@/lib/event-info";
 import { SCHEDULED_DEADLINES } from "@/lib/deadline-schedule";
+import type { PortalContentFields } from "@/lib/portal-content";
 import type { Workstream } from "@/lib/portal-config";
 import type { Deliverable, EventName, PortalDetail } from "@/lib/types";
 
@@ -35,18 +36,47 @@ export interface PackageRow {
 }
 
 /**
- * The Overview tab's Quick Links + "Your partnership at a glance" pairing,
- * scoped to one event. A partner sponsoring both DTM27 and SPARTA27 (e.g. PA
- * Consulting Group) gets one of these per event — each with its own quick
- * links and its own deliverables — instead of a single shared card mixing
- * both events' info together, which read as one confusing, undifferentiated
- * list.
+ * Per-event accent color, so a dual-event partner can visually tell DTM27
+ * and SPARTA27 apart at a glance (day-countdown boxes, event card headers) —
+ * reuses the two brand colors already in globals.css rather than inventing
+ * new ones. Everything other than SPARTA27 defaults to the main DTM accent.
+ */
+export function eventAccentVar(event: EventName): string {
+  return event === "SPARTA 2027" ? "var(--violet-400)" : "var(--accent)";
+}
+
+/**
+ * One event's card on the Overview tab — a partner sponsoring both DTM27 and
+ * SPARTA27 (e.g. APEX Ventures) gets one of these per event, each with its
+ * own dates/venue, deliverables and practical links, instead of a single
+ * shared card mixing both events' info together, which read as one
+ * confusing, undifferentiated list.
  */
 export interface EventOverviewSection {
   event: EventName;
   eventLabel: string;
-  quickLinks: PackageRow[];
+  accentVar: string;
+  /** Null when the event has no known start date (shouldn't happen for a current-cycle event, but EVENT_INFO is a Partial). */
+  daysAway: number | null;
+  /** Compact date for the countdown box header (no build-up suffix) — dateLine below is the fuller version shown in the card body. */
+  shortDate: string;
+  dateLine: string;
+  location: string;
+  context?: string;
+  /** Website / Floor plan / Hotel booking — practical links only; dates/location/context are their own fields above instead of being mixed into this list. */
+  practicalLinks: PackageRow[];
   glanceRows: PackageRow[];
+}
+
+/** One calendar deadline that's still upcoming and applies to this partner — the Overview tab's "What we need from you" summary. Real data only: sourced from the same audience-filtered SCHEDULED_DEADLINES as the Key Dates tab, never invented per-item copy. */
+export interface UpcomingActionItem {
+  id: string;
+  title: string;
+  date: string;
+  daysAway: number;
+  hard: boolean;
+  /** Short event label(s) this deadline applies to, e.g. "DTM27" or "DTM27 & SPARTA27" — reflects ScheduledDeadline.events, not a guess. */
+  eventTag: string;
 }
 
 export interface KeyDateRow {
@@ -160,13 +190,13 @@ export function getPartnerObligationProgress(
 export interface PortalView {
   companyName: string;
   eventLabel: string;
-  headerSubtitle: string;
-  /** One entry per scoped event — two for a partner sponsoring both DTM27 and SPARTA27. */
-  daysToEvents: { label: string; value: number }[];
+  /** Each scoped event's own dates/venue now live on its EventOverviewSection card instead of a shared header line — see eventSections. */
   tabs: { id: TabId; label: string; staffOnly?: boolean }[];
   eventSections: EventOverviewSection[];
   hasGuardian: boolean;
   hasMeet: boolean;
+  /** The actual matchmaking/1:1-meetings deliverables (e.g. "DTM100 Early Access & Co-Selection", "LP-GP Marketplace — Invitation") — for the "Who do you want to meet" card's "Curated 1:1s in your package" line. */
+  matchmakingItems: Deliverable[];
   keyDates: KeyDateRow[];
   ticketItems: Deliverable[];
   hasBooth: boolean;
@@ -175,6 +205,8 @@ export interface PortalView {
   deliverableChecklist: ActionItem[];
   /** What the partner owes DTM — the partner-visible Action Items tab. */
   partnerObligations: PartnerObligation[];
+  /** Upcoming calendar deadlines that apply to this partner, soonest first — the Overview tab's "What we need from you" summary. Empty once every applicable deadline has passed. */
+  upcomingActionItems: UpcomingActionItem[];
   workstreamsPresent: string[];
   contractLink: string | null;
   contractSignedDate: string | null;
@@ -258,7 +290,13 @@ const WORKSTREAM_ORDER: Workstream[] = [
   "Marketing & Comms",
 ];
 
-export function buildPortalView(portal: PortalDetail): PortalView {
+export function buildPortalView(
+  portal: PortalDetail,
+  links: Pick<PortalContentFields, "hotelBookingUrl" | "floorPlanUrls"> = {
+    hotelBookingUrl: null,
+    floorPlanUrls: {},
+  },
+): PortalView {
   const deliverables = portal.deliverables;
 
   const booth = byWorkstream(deliverables, "Exhibition / Booth");
@@ -313,7 +351,7 @@ export function buildPortalView(portal: PortalDetail): PortalView {
   // is calendar-fixed, not per-partner Attio data, so it's merged in here
   // rather than relying solely on Attio Deliverables' sparsely-populated
   // due_date field.
-  const scheduledDeadlineRows: KeyDateRow[] = SCHEDULED_DEADLINES.filter((d) => {
+  function appliesToThisPartner(d: (typeof SCHEDULED_DEADLINES)[number]): boolean {
     if (!d.events.some((e) => scopedEvents.includes(e))) return false;
     switch (d.appliesTo) {
       case "everyone":
@@ -329,12 +367,31 @@ export function buildPortalView(portal: PortalDetail): PortalView {
       default:
         return false;
     }
-  }).map((d) => ({
+  }
+  const applicableDeadlines = SCHEDULED_DEADLINES.filter(appliesToThisPartner);
+  const scheduledDeadlineRows: KeyDateRow[] = applicableDeadlines.map((d) => ({
     date: d.date,
     what: d.what,
     workstream: "Partner deadline",
     hard: d.hard,
   }));
+
+  // Today's date as an ISO string (UTC) — matches the YYYY-MM-DD format
+  // every ScheduledDeadline.date uses, so a plain string comparison works.
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  /** The Overview tab's "What we need from you" summary — same real, audience-filtered deadlines as the Key Dates tab, narrowed to ones that haven't passed yet. */
+  const upcomingActionItems: UpcomingActionItem[] = applicableDeadlines
+    .filter((d) => d.date >= todayIso)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((d) => ({
+      id: `${d.date}-${d.what}`,
+      title: d.what,
+      date: d.date,
+      daysAway: daysUntil(d.date),
+      hard: d.hard,
+      eventTag: d.events.map((e) => (e === "SPARTA 2027" ? "SPARTA27" : e)).join(" & "),
+    }));
 
   const keyDates: KeyDateRow[] = [
     ...deliverables
@@ -354,37 +411,37 @@ export function buildPortalView(portal: PortalDetail): PortalView {
     .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"))
     .map((d) => ({ id: d.id, title: formatDeliverableName(d), phase: d.phase || "—", due: d.dueDate }));
 
-  // One Quick Links + "Your partnership at a glance" pairing per scoped
-  // event — a partner sponsoring both DTM27 and SPARTA27 gets each event's
-  // own quick links and deliverables kept apart, instead of merged into one
-  // undifferentiated list. Row labels stay short ("Dates", "Website", ...)
-  // since the event name already sits in the section/card heading. Ordered
+  // One card per scoped event — a partner sponsoring both DTM27 and SPARTA27
+  // gets each event's own dates/venue, deliverables and practical links kept
+  // apart, instead of merged into one undifferentiated list. Ordered
   // chronologically (whichever event happens first, e.g. SPARTA27 in
   // February, appears before DTM27 in May) rather than by raw Attio order.
   const eventSections: EventOverviewSection[] = [...scopedEvents]
     .sort((a, b) => (EVENT_INFO[a]?.startDate ?? "9999").localeCompare(EVENT_INFO[b]?.startDate ?? "9999"))
-    .map((event) => {
+    .map((event): EventOverviewSection | null => {
       const info = EVENT_INFO[event];
       if (!info) return null;
-      const quickLinks: PackageRow[] = [
+
+      const practicalLinks: PackageRow[] = [
         {
-          label: "Dates",
-          values: [info.buildUp ? `${info.dates} · Build-up ${info.buildUp}` : info.dates],
+          label: "Website",
+          values: [info.website.replace(/^https?:\/\//, "")],
+          href: info.website,
         },
-        { label: "Location", values: [info.location] },
       ];
-      if (info.context) {
-        quickLinks.push({ label: "Context", values: [info.context] });
-      }
-      quickLinks.push({
-        label: "Website",
-        values: [info.website.replace(/^https?:\/\//, "")],
-        href: info.website,
-      });
       if (info.hasFloorPlan) {
-        quickLinks.push({ label: "Floor plan", values: ["Coming soon"] });
+        const floorPlanUrl = links.floorPlanUrls[event];
+        practicalLinks.push(
+          floorPlanUrl
+            ? { label: "Floor plan", values: ["View floor plan"], href: floorPlanUrl }
+            : { label: "Floor plan", values: ["Coming soon"] },
+        );
       }
-      quickLinks.push({ label: "Hotel booking", values: ["Coming soon"] });
+      practicalLinks.push(
+        links.hotelBookingUrl
+          ? { label: "Hotel booking", values: ["Book your stay"], href: links.hotelBookingUrl }
+          : { label: "Hotel booking", values: ["Coming soon"] },
+      );
 
       return {
         event,
@@ -392,20 +449,17 @@ export function buildPortalView(portal: PortalDetail): PortalView {
         // full "SPARTA 2027") — the actual EventName value (above) is used
         // for filtering, the header countdown, media kit lookup, etc.
         eventLabel: event === "SPARTA 2027" ? "SPARTA27" : event,
-        quickLinks,
+        accentVar: eventAccentVar(event),
+        daysAway: daysUntil(info.startDate),
+        shortDate: info.dates,
+        dateLine: info.buildUp ? `${info.dates} · Build-up ${info.buildUp}` : info.dates,
+        location: info.location,
+        context: info.context,
+        practicalLinks,
         glanceRows: packageRowsFor(deliverables.filter((d) => d.events.includes(event))),
       };
     })
     .filter((s): s is EventOverviewSection => s !== null);
-
-  // One countdown per scoped event — a dual-event partner sees both, not
-  // just whichever event happened to be first in the raw Attio list.
-  const daysToEvents = scopedEvents
-    .map((e) => {
-      const startDate = EVENT_INFO[e]?.startDate;
-      return startDate ? { label: `Days to ${e}`, value: daysUntil(startDate) } : null;
-    })
-    .filter((d): d is { label: string; value: number } => d !== null);
 
   // Guardians attend DTM27 itself, so nominating them only makes sense for
   // partners actually sponsoring DTM27 — not a SPARTA27-only partner.
@@ -422,25 +476,19 @@ export function buildPortalView(portal: PortalDetail): PortalView {
 
   return {
     companyName: portal.companyName,
-    eventLabel: scopedEvents.join(" & "),
-    headerSubtitle: scopedEvents
-      .map((e) => {
-        const info = EVENT_INFO[e];
-        return info ? `${info.dates} · ${info.location}` : null;
-      })
-      .filter((s): s is string => !!s)
-      .join(" · "),
-    daysToEvents,
+    eventLabel: scopedEvents.map((e) => (e === "SPARTA 2027" ? "SPARTA27" : e)).join(" & "),
     tabs,
     eventSections,
     hasGuardian,
     hasMeet: matchmaking.length > 0,
+    matchmakingItems: matchmaking,
     keyDates,
     ticketItems: passes,
     hasBooth: booth.length > 0,
     boothItems: booth,
     deliverableChecklist,
     partnerObligations,
+    upcomingActionItems,
     workstreamsPresent: Array.from(new Set(deliverables.map((d) => d.workstream))).filter(Boolean),
     contractLink: portal.contractLink,
     contractSignedDate: portal.contractSignedDate,

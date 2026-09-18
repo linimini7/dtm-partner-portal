@@ -2,13 +2,25 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getRawPortalContent } from "@/lib/portal-content";
-import { updateGlobalExhibitorGuidelines, updateGlobalPlatformUrl } from "./actions";
+import { listDtmContacts } from "@/lib/dtm-contacts";
+import {
+  addDtmContactAction,
+  deleteDtmContactAction,
+  updateDtmContactAction,
+  updateGlobalExhibitorGuidelines,
+  updateGlobalFloorPlanUrl,
+  updateGlobalHotelBookingUrl,
+  updateGlobalPlatformUrl,
+} from "./actions";
 
 export default async function PortalSettingsPage() {
   const session = await auth();
   if (!session) redirect("/sign-in");
 
   const content = await getRawPortalContent("global");
+  const dtmContacts = await listDtmContacts();
+  const updateFloorPlanDtm27 = updateGlobalFloorPlanUrl.bind(null, "DTM27");
+  const updateFloorPlanSparta27 = updateGlobalFloorPlanUrl.bind(null, "SPARTA 2027");
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 px-6 py-10">
@@ -76,6 +88,228 @@ export default async function PortalSettingsPage() {
             Save DTM27 platform URL
           </button>
         </form>
+      </div>
+
+      <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6">
+        <p className="eyebrow mb-2">Hotel booking</p>
+        <p className="mb-4 text-sm text-fg-4">
+          The link every partner sees under Quick Links → Hotel booking, for every event. Changing
+          it updates it for every partner in one click.
+        </p>
+        <form action={updateGlobalHotelBookingUrl} className="space-y-4">
+          <label className="block text-sm">
+            <span className="mb-1 block text-fg-3">Hotel booking URL</span>
+            <input
+              type="url"
+              name="hotelBookingUrl"
+              defaultValue={content.hotelBookingUrl ?? ""}
+              placeholder="https://…"
+              className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-[8px] px-4 py-2 text-sm font-medium"
+            style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
+          >
+            Save hotel booking URL
+          </button>
+        </form>
+      </div>
+
+      <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6">
+        <p className="eyebrow mb-2">Floor plans</p>
+        <p className="mb-4 text-sm text-fg-4">
+          The link every partner sees under Quick Links → Floor plan, per event. Each event has
+          its own venue, so its own plan.
+        </p>
+        <div className="grid gap-6 sm:grid-cols-2">
+          <form action={updateFloorPlanDtm27} className="space-y-3">
+            <label className="block text-sm">
+              <span className="mb-1 block text-fg-3">DTM27 floor plan URL</span>
+              <input
+                type="url"
+                name="floorPlanUrl"
+                defaultValue={content.floorPlanUrls.DTM27 ?? ""}
+                placeholder="https://…"
+                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+              />
+            </label>
+            <button
+              type="submit"
+              className="rounded-[8px] px-4 py-2 text-sm font-medium"
+              style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
+            >
+              Save DTM27 floor plan
+            </button>
+          </form>
+          <form action={updateFloorPlanSparta27} className="space-y-3">
+            <label className="block text-sm">
+              <span className="mb-1 block text-fg-3">SPARTA27 floor plan URL</span>
+              <input
+                type="url"
+                name="floorPlanUrl"
+                defaultValue={content.floorPlanUrls["SPARTA 2027"] ?? ""}
+                placeholder="https://…"
+                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+              />
+            </label>
+            <button
+              type="submit"
+              className="rounded-[8px] px-4 py-2 text-sm font-medium"
+              style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
+            >
+              Save SPARTA27 floor plan
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6">
+        <p className="eyebrow mb-2">DTM team contacts</p>
+        <p className="mb-4 text-sm text-fg-4">
+          Who every partner sees under &quot;Your point of contact.&quot; Editing someone here
+          (their email, phone, or a status like &quot;On maternal leave&quot;) updates it on every
+          partner&apos;s portal immediately — no need to touch Attio. Add another person if
+          someone needs to be covered for or added.
+        </p>
+        <div className="flex flex-col gap-4">
+          {dtmContacts.map((c) => {
+            const updateThis = updateDtmContactAction.bind(null, c.id);
+            const deleteThis = deleteDtmContactAction.bind(null, c.id);
+            return (
+              <form
+                key={c.id}
+                action={updateThis}
+                className="grid gap-3 rounded-[10px] border border-dtm-hairline p-4 sm:grid-cols-2"
+              >
+                <label className="block text-sm">
+                  <span className="mb-1 block text-fg-3">Name</span>
+                  <input
+                    type="text"
+                    name="name"
+                    defaultValue={c.name}
+                    required
+                    className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="mb-1 block text-fg-3">Role</span>
+                  <input
+                    type="text"
+                    name="role"
+                    defaultValue={c.role ?? ""}
+                    placeholder="e.g. Head of Operations"
+                    className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="mb-1 block text-fg-3">Email</span>
+                  <input
+                    type="email"
+                    name="contactEmail"
+                    defaultValue={c.email ?? ""}
+                    className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="mb-1 block text-fg-3">Phone</span>
+                  <input
+                    type="tel"
+                    name="phone"
+                    defaultValue={c.phone ?? ""}
+                    placeholder="Add phone number"
+                    className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+                  />
+                </label>
+                <label className="block text-sm sm:col-span-2">
+                  <span className="mb-1 block text-fg-3">Status (optional)</span>
+                  <input
+                    type="text"
+                    name="status"
+                    defaultValue={c.status ?? ""}
+                    placeholder="e.g. On maternal leave — contact Jonas instead"
+                    className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+                  />
+                </label>
+                <div className="flex gap-3 sm:col-span-2">
+                  <button
+                    type="submit"
+                    className="rounded-[8px] px-4 py-2 text-sm font-medium"
+                    style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="submit"
+                    formAction={deleteThis}
+                    className="rounded-[8px] border border-dtm-hairline px-4 py-2 text-sm text-fg-3"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </form>
+            );
+          })}
+
+          <form
+            action={addDtmContactAction}
+            className="grid gap-3 rounded-[10px] border border-dashed border-dtm-hairline p-4 sm:grid-cols-2"
+          >
+            <p className="text-sm text-fg-3 sm:col-span-2">Add another contact</p>
+            <label className="block text-sm">
+              <span className="mb-1 block text-fg-3">Name</span>
+              <input
+                type="text"
+                name="name"
+                required
+                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-fg-3">Role</span>
+              <input
+                type="text"
+                name="role"
+                placeholder="e.g. Head of Operations"
+                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-fg-3">Email</span>
+              <input
+                type="email"
+                name="contactEmail"
+                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-fg-3">Phone</span>
+              <input
+                type="tel"
+                name="phone"
+                placeholder="Add phone number"
+                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+              />
+            </label>
+            <label className="block text-sm sm:col-span-2">
+              <span className="mb-1 block text-fg-3">Status (optional)</span>
+              <input
+                type="text"
+                name="status"
+                placeholder="e.g. On maternal leave — contact Jonas instead"
+                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
+              />
+            </label>
+            <button
+              type="submit"
+              className="self-start rounded-[8px] px-4 py-2 text-sm font-medium sm:col-span-2"
+              style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
+            >
+              Add contact
+            </button>
+          </form>
+        </div>
       </div>
     </main>
   );

@@ -39,6 +39,8 @@ export async function getBrandAssets(slug: string): Promise<BrandAssets> {
 export interface EmailDerivedContact {
   name: string | null;
   email: string;
+  /** For quick reach — set by either side via PartnerContactsCard, independent of whether the name/email above came from Attio's "poc" or email-ingestion (unlike those, Attio has no field this reads from). */
+  phone: string | null;
 }
 
 /** The partner contact lib/email-ingestion.ts picked up from a real email — only present when nobody has set a "poc" on the Attio CS Tracker entry yet (see admin/page.tsx, which prefers that over this). */
@@ -46,10 +48,23 @@ export async function getEmailDerivedContact(slug: string): Promise<EmailDerived
   const { rows } = await getPool().query<{
     partner_contact_name: string | null;
     partner_contact_email: string | null;
-  }>("SELECT partner_contact_name, partner_contact_email FROM portal_content WHERE scope = $1", [slug]);
+    partner_contact_phone: string | null;
+  }>(
+    "SELECT partner_contact_name, partner_contact_email, partner_contact_phone FROM portal_content WHERE scope = $1",
+    [slug],
+  );
   const email = rows[0]?.partner_contact_email;
   if (!email) return null;
-  return { name: rows[0]?.partner_contact_name ?? null, email };
+  return { name: rows[0]?.partner_contact_name ?? null, email, phone: rows[0]?.partner_contact_phone ?? null };
+}
+
+/** Just the phone number, for when the displayed name/email came from Attio's "poc" instead (see app/p/[slug]/page.tsx) — phone has no Attio equivalent, so it's always sourced from here regardless. */
+export async function getPartnerContactPhone(slug: string): Promise<string | null> {
+  const { rows } = await getPool().query<{ partner_contact_phone: string | null }>(
+    "SELECT partner_contact_phone FROM portal_content WHERE scope = $1",
+    [slug],
+  );
+  return rows[0]?.partner_contact_phone ?? null;
 }
 
 /**
@@ -60,24 +75,97 @@ export async function getEmailDerivedContact(slug: string): Promise<EmailDerived
  * checked (see app/p/[slug]/page.tsx and admin/page.tsx), so this only
  * actually changes what's shown when no staff-set contact exists yet;
  * otherwise it's a proposal staff see via the activity log without it
- * silently overriding what they set in Attio.
+ * silently overriding what they set in Attio. Phone is the exception: it has
+ * no Attio field to defer to, so it always takes effect (see getPartnerContactPhone).
  */
 export async function upsertPartnerContact(
   scope: string,
   name: string | null,
   email: string,
+  phone: string | null,
   updatedBy: string,
 ): Promise<void> {
   await getPool().query(
-    `INSERT INTO portal_content (scope, partner_contact_name, partner_contact_email, partner_contact_source, updated_at, updated_by)
-     VALUES ($1, $2, $3, 'partner', now(), $4)
+    `INSERT INTO portal_content (scope, partner_contact_name, partner_contact_email, partner_contact_phone, partner_contact_source, updated_at, updated_by)
+     VALUES ($1, $2, $3, $4, 'partner', now(), $5)
      ON CONFLICT (scope) DO UPDATE SET
        partner_contact_name = EXCLUDED.partner_contact_name,
        partner_contact_email = EXCLUDED.partner_contact_email,
+       partner_contact_phone = EXCLUDED.partner_contact_phone,
        partner_contact_source = EXCLUDED.partner_contact_source,
        updated_at = now(),
        updated_by = EXCLUDED.updated_by`,
-    [scope, name, email, updatedBy],
+    [scope, name, email, phone, updatedBy],
+  );
+}
+
+export interface EmailDerivedContact2 {
+  name: string | null;
+  email: string;
+  phone: string | null;
+}
+
+/** A second, partner-nominated point of contact — for when one person signs/receives but someone else should also be reachable. Portal-local only (no Attio equivalent field), so unlike the primary contact there's no "staff already set this in Attio" precedence to defer to. */
+export async function getSecondPartnerContact(slug: string): Promise<EmailDerivedContact2 | null> {
+  const { rows } = await getPool().query<{
+    partner_contact_2_name: string | null;
+    partner_contact_2_email: string | null;
+    partner_contact_2_phone: string | null;
+  }>(
+    "SELECT partner_contact_2_name, partner_contact_2_email, partner_contact_2_phone FROM portal_content WHERE scope = $1",
+    [slug],
+  );
+  const email = rows[0]?.partner_contact_2_email;
+  if (!email) return null;
+  return {
+    name: rows[0]?.partner_contact_2_name ?? null,
+    email,
+    phone: rows[0]?.partner_contact_2_phone ?? null,
+  };
+}
+
+/** Unlike upsertPartnerContact, an empty email clears this slot rather than erroring — a second contact is optional by nature. */
+export async function upsertSecondPartnerContact(
+  scope: string,
+  name: string | null,
+  email: string | null,
+  phone: string | null,
+  updatedBy: string,
+): Promise<void> {
+  await getPool().query(
+    `INSERT INTO portal_content (scope, partner_contact_2_name, partner_contact_2_email, partner_contact_2_phone, partner_contact_2_source, updated_at, updated_by)
+     VALUES ($1, $2, $3, $4, 'partner', now(), $5)
+     ON CONFLICT (scope) DO UPDATE SET
+       partner_contact_2_name = EXCLUDED.partner_contact_2_name,
+       partner_contact_2_email = EXCLUDED.partner_contact_2_email,
+       partner_contact_2_phone = EXCLUDED.partner_contact_2_phone,
+       partner_contact_2_source = EXCLUDED.partner_contact_2_source,
+       updated_at = now(),
+       updated_by = EXCLUDED.updated_by`,
+    [scope, name, email, phone, updatedBy],
+  );
+}
+
+/** Whether this exact attachment (by content hash) has already been flagged as an unsupported logo format for this partner — keeps lib/email-ingestion.ts's daily re-scan from re-logging the same .eps file every single day. */
+export async function hasFlaggedAttachment(scope: string, contentHash: string): Promise<boolean> {
+  const { rows } = await getPool().query(
+    "SELECT 1 FROM portal_flagged_attachments WHERE scope = $1 AND content_hash = $2 LIMIT 1",
+    [scope, contentHash],
+  );
+  return rows.length > 0;
+}
+
+export async function recordFlaggedAttachment(
+  scope: string,
+  contentHash: string,
+  filename: string,
+  format: string,
+): Promise<void> {
+  await getPool().query(
+    `INSERT INTO portal_flagged_attachments (scope, content_hash, filename, format, created_at)
+     VALUES ($1, $2, $3, $4, now())
+     ON CONFLICT (scope, content_hash) DO NOTHING`,
+    [scope, contentHash, filename, format],
   );
 }
 
