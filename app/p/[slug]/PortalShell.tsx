@@ -503,7 +503,7 @@ export default function PortalShell({
                           borderBottom: `1px solid ${section.accentVar}24`,
                         }}
                       >
-                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="flex items-start justify-between gap-3">
                           <div className="flex flex-col gap-[2px] min-w-0">
                             <div
                               className="text-[27px] font-bold leading-[1.1] tracking-[-0.035em]"
