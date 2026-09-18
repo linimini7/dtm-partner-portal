@@ -234,7 +234,10 @@ function byWorkstream(deliverables: Deliverable[], workstream: Workstream): Deli
  * (different recipient), not because of a data error.
  */
 export function formatDeliverableName(d: Deliverable): string {
-  return d.quantity && d.quantity > 1 ? `${d.name} × ${d.quantity}` : d.name;
+  // Always show the quantity when one exists, even "× 1" — a partner
+  // shouldn't have to infer "just one" from its absence next to items that
+  // do show a count.
+  return d.quantity ? `${d.name} × ${d.quantity}` : d.name;
 }
 
 /**

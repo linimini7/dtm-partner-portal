@@ -437,7 +437,7 @@ export default function PortalShell({
                   {view.upcomingActionItems.slice(0, 3).map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between gap-4 flex-wrap p-[15px_22px]"
+                      className="flex items-center justify-between gap-4 flex-wrap p-[10px_22px]"
                       style={{ borderBottom: "1px solid var(--dtm-surface-2)" }}
                     >
                       <div className="min-w-0" style={{ flex: "1 1 280px" }}>
@@ -504,20 +504,20 @@ export default function PortalShell({
                         }}
                       >
                         <div className="flex items-start justify-between gap-3 flex-wrap">
-                          <div className="flex flex-col gap-[5px] min-w-0">
+                          <div className="flex flex-col gap-[2px] min-w-0">
                             <div
-                              className="text-[18px] font-bold tracking-[-0.025em]"
+                              className="text-[27px] font-bold leading-[1.1] tracking-[-0.035em]"
                               style={{ color: section.accentVar }}
                             >
                               {section.eventLabel}
                             </div>
-                            <div className="text-[12.5px] text-fg-2 leading-[1.45]">{section.dateLine}</div>
-                            <div className="text-[12px] text-fg-4 leading-[1.45]">{section.location}</div>
+                            <div className="text-[12.5px] text-fg-2 leading-[1.3]">{section.dateLine}</div>
+                            <div className="text-[12px] text-fg-4 leading-[1.3]">{section.location}</div>
                           </div>
                           {section.daysAway !== null && (
-                            <div className="flex flex-col gap-[3px] text-right shrink-0">
+                            <div className="flex flex-col gap-[2px] text-right shrink-0">
                               <div
-                                className="text-[27px] font-bold leading-[1] tracking-[-0.035em]"
+                                className="text-[27px] font-bold leading-[1.1] tracking-[-0.035em]"
                                 style={{ color: section.accentVar }}
                               >
                                 {section.daysAway}
