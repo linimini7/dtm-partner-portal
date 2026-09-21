@@ -64,30 +64,21 @@ export default function BrandAssetsCard({
   if (!editing) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex justify-between items-start gap-3 flex-wrap">
           <div>
             <div className="text-[15px] font-semibold text-fg-1">What we need from you</div>
             <div className="text-[12.5px] text-fg-4">
               Your logo, a short description and your website.
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            {deadline && (
-              <div className="text-right">
-                <div className="eyebrow">Submit by</div>
-                <div className="font-mono text-[13px] font-semibold" style={{ color: "var(--warn)" }}>
-                  {formatDate(deadline)}
-                </div>
+          {deadline && (
+            <div className="text-right">
+              <div className="eyebrow">Submit by</div>
+              <div className="font-mono text-[13px] font-semibold" style={{ color: "var(--warn)" }}>
+                {formatDate(deadline)}
               </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="rounded-[8px] border border-dtm-hairline px-3 py-1.5 text-sm font-medium text-fg-2 whitespace-nowrap"
-            >
-              Submit
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-1">
@@ -140,6 +131,17 @@ export default function BrandAssetsCard({
           ) : (
             <span className="text-sm text-fg-5">Not added yet</span>
           )}
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="rounded-[8px] px-4 py-2 text-sm font-medium"
+            style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
+          >
+            Submit
+          </button>
         </div>
       </div>
     );
