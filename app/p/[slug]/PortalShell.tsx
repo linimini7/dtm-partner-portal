@@ -367,10 +367,7 @@ export default function PortalShell({
   // sizes this off its own grid column instead, per the conversation this
   // was fixed in ("make it relative, don't fix it").
   const experienceCardsNode = view.hasGuardian ? (
-    <div
-      className="grid gap-[18px] items-start"
-      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}
-    >
+    <div className="flex flex-col gap-[18px]">
       <Card
         style={{
           border: "1px solid rgb(79 169 122 / 28%)",
@@ -997,7 +994,7 @@ export default function PortalShell({
                         >
                           <div className="flex justify-between items-center gap-3">
                             <div className="text-[13.5px] text-fg-1">{d.name}</div>
-                            {d.quantity && d.quantity > 1 && (
+                            {d.quantity && (
                               <div className="font-mono text-[15px] text-fg-3">× {d.quantity}</div>
                             )}
                           </div>

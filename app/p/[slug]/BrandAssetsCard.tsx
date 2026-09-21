@@ -64,7 +64,7 @@ export default function BrandAssetsCard({
   if (!editing) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-[15px] font-semibold text-fg-1">What we need from you</div>
             <div className="text-[12.5px] text-fg-4">
