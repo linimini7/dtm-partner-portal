@@ -107,7 +107,16 @@ export default function BrandAssetsCard({
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[11px] text-fg-5">Logos</span>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] text-fg-5">Logos</span>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-[8px] border border-dtm-hairline px-3 py-1.5 text-sm font-medium text-fg-2 whitespace-nowrap"
+            >
+              Edit
+            </button>
+          </div>
           {filledLogos.length > 0 ? (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
               {filledLogos.map(({ slot }) => (
@@ -131,16 +140,6 @@ export default function BrandAssetsCard({
           ) : (
             <span className="text-sm text-fg-5">Not added yet</span>
           )}
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="rounded-[8px] border border-dtm-hairline px-4 py-2 text-sm font-medium text-fg-2 whitespace-nowrap"
-          >
-            Edit
-          </button>
         </div>
       </div>
     );

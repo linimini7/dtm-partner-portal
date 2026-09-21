@@ -64,8 +64,15 @@ export interface PortalSummary {
   deliverablesTotal: number;
   overdueCount: number;
   nextDeadline: string | null;
-  /** What this partner owes DTM (logo/guidelines, announce, Guardians, named-attendee seats) — see lib/portal-view.ts's derivePartnerObligations. Metadata only (id/title/note); whether each is actually done lives in Postgres, not here. */
-  partnerObligations: { id: string; title: string; note: string }[];
+  /** What this partner owes DTM (logo/guidelines, announce, Guardians, named-attendee seats) — see lib/portal-view.ts's derivePartnerObligations. Whether each is actually done lives in Postgres, not here; deadlineDate/deadlineHard/deadlineDaysAway are null on this summary shape (only buildPortalView has the SCHEDULED_DEADLINES context to fill them in). */
+  partnerObligations: {
+    id: string;
+    title: string;
+    note: string;
+    deadlineDate: string | null;
+    deadlineHard: boolean;
+    deadlineDaysAway: number | null;
+  }[];
 }
 
 export interface PortalDetail extends PortalSummary {

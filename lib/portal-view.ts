@@ -98,6 +98,19 @@ export interface PartnerObligation {
   id: string;
   title: string;
   note: string;
+  /**
+   * The closest matching Notion-sourced deadline for this obligation, if
+   * any — set by buildPortalView (needs SCHEDULED_DEADLINES context this
+   * function doesn't have), null here and for callers that only need the
+   * plain obligation list (e.g. the /portals staff table's progress count).
+   * Not every obligation has a real fixed date in the template (Guardians
+   * nomination and announcing the partnership are both explicitly rolling),
+   * so null also means "no invented date" for those, not "not yet computed".
+   */
+  deadlineDate: string | null;
+  deadlineHard: boolean;
+  /** Days from today to deadlineDate, clamped at 0 once passed — null alongside deadlineDate when there's no match. */
+  deadlineDaysAway: number | null;
 }
 
 // Programme seats (CXO Summit / CVC Summit / LP-GP Marketplace) and
@@ -127,11 +140,17 @@ export function derivePartnerObligations(scopedEvents: EventName[], deliverables
       id: "logo",
       title: "Submit your logo & brand guidelines",
       note: "So we can start using it across signage and campaign materials.",
+      deadlineDate: null,
+      deadlineHard: false,
+      deadlineDaysAway: null,
     },
     {
       id: "announce",
       title: "Publicly announce the partnership",
       note: "A social media post or newsletter mention — whenever you're ready.",
+      deadlineDate: null,
+      deadlineHard: false,
+      deadlineDaysAway: null,
     },
   ];
   if (scopedEvents.includes("DTM27")) {
@@ -139,6 +158,9 @@ export function derivePartnerObligations(scopedEvents: EventName[], deliverables
       id: "guardians",
       title: "Nominate Guardians for the programme",
       note: "Rolling — the earlier you nominate, the better.",
+      deadlineDate: null,
+      deadlineHard: false,
+      deadlineDaysAway: null,
     });
   }
   for (const programme of NAMED_ATTENDEE_PROGRAMMES) {
@@ -147,6 +169,9 @@ export function derivePartnerObligations(scopedEvents: EventName[], deliverables
         id: programme.id,
         title: `Nominate your attendee(s) for ${programme.label}`,
         note: "Let us know who's coming so we can confirm their seat.",
+        deadlineDate: null,
+        deadlineHard: false,
+        deadlineDaysAway: null,
       });
     }
   }
@@ -451,7 +476,31 @@ export function buildPortalView(
   // partners actually sponsoring DTM27 — not a SPARTA27-only partner.
   const hasGuardian = scopedEvents.includes("DTM27");
 
-  const partnerObligations = derivePartnerObligations(scopedEvents, deliverables);
+  // Attaches the closest logically-matching Notion "Your key dates" entry
+  // to each real partner obligation, since staff asked for the dates back
+  // on "What we need from you" without reintroducing the internal DTM
+  // logistics milestones (booth details, add-ons, etc.) that used to bloat
+  // it — see the conversation this was scoped down in. Not every obligation
+  // has a genuine match: "announce" and "guardians" are explicitly rolling
+  // in every template read so far, so they stay dateless rather than being
+  // pinned to an invented deadline.
+  function deadlineForObligation(obligationId: string): (typeof applicableDeadlines)[number] | undefined {
+    if (obligationId === "logo") return brandAssetsDeadlineEntry;
+    if (obligationId === "announce" || obligationId === "guardians") return undefined;
+    // Named-attendee programme seats (LP-GP Marketplace, CXO/CVC Summit,
+    // Investor Dinner) — the template's own "who's attending" cutoff is the
+    // closest real signal for "tell us who's coming".
+    return applicableDeadlines.find((d) => /attend|matchmaking/i.test(d.what));
+  }
+  const partnerObligations = derivePartnerObligations(scopedEvents, deliverables).map((o) => {
+    const match = deadlineForObligation(o.id);
+    return {
+      ...o,
+      deadlineDate: match?.date ?? null,
+      deadlineHard: match?.hard ?? false,
+      deadlineDaysAway: match ? daysUntil(match.date) : null,
+    };
+  });
 
   const tabs: { id: TabId; label: string; staffOnly?: boolean }[] = [
     { id: "overview", label: "Overview" },

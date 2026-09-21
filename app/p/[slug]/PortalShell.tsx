@@ -249,6 +249,18 @@ export default function PortalShell({
     return !obligationChecks[o.id];
   });
 
+  // The per-company sales lead (from Attio) and the global DTM contacts
+  // list (staff-editable on Global portal settings) started out as two
+  // independent sources — once the same person exists in both (e.g. Sarah
+  // is both a company's Attio sales lead AND added to dtmContacts so her
+  // "on maternal leave" status can be edited), showing both renders her
+  // twice. The dtmContacts entry wins when names match (it's the editable,
+  // up-to-date one); the Attio-only fallback only shows for a sales lead
+  // nobody's added to dtmContacts yet.
+  const salesLeadInDtmContacts = salesLead
+    ? dtmContacts.some((c) => c.name.trim().toLowerCase() === salesLead.name.trim().toLowerCase())
+    : false;
+
   // Real, persisted nominee count (see NomineeEditor) — labeled "nominated"
   // rather than "confirmed" since confirmation happens later, outside the
   // portal, and isn't tracked anywhere yet.
@@ -560,7 +572,7 @@ export default function PortalShell({
             style={{ border: "1px solid var(--dtm-hairline)", background: "var(--dtm-surface)" }}
           >
             <div className="eyebrow">Your DTM team</div>
-            {salesLead && (
+            {salesLead && !salesLeadInDtmContacts && (
               <div className="flex flex-col gap-0.5">
                 <div className="text-[12.5px] font-medium text-fg-2">{salesLead.name}</div>
                 <div className="text-[11px] text-fg-4">Partnership</div>
@@ -718,6 +730,17 @@ export default function PortalShell({
                         <div className="text-[13.5px] font-medium text-fg-1">{o.title}</div>
                         <div className="text-[11.5px] text-fg-4">{o.note}</div>
                       </div>
+                      {o.deadlineDate && (
+                        <div className="flex flex-col gap-0.5 text-right shrink-0" style={{ minWidth: 92 }}>
+                          <div
+                            className="font-mono text-[12.5px] font-medium"
+                            style={{ color: (o.deadlineDaysAway ?? 0) <= 60 ? "var(--warn)" : "var(--fg-2)" }}
+                          >
+                            {formatDate(o.deadlineDate)}
+                          </div>
+                          <div className="text-[10.5px] text-fg-5">in {o.deadlineDaysAway} days</div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -992,12 +1015,17 @@ export default function PortalShell({
                         </div>
                       );
                     })}
-                    <div className="flex items-center justify-end gap-2.5 pt-1">
+                    <div className="flex items-center justify-between gap-3 pt-1 flex-wrap">
+                      <div className="text-[11px] text-fg-5 leading-[1.4]">
+                        Only tick &quot;Redeemed&quot; once you&apos;ve actually redeemed that pass
+                        using the code above, then hit Save — this also checks it off under Action
+                        items.
+                      </div>
                       <button
                         type="button"
                         onClick={handleSaveRedeemed}
                         disabled={!redeemedDirty || redeemedSaving}
-                        className="rounded-[8px] px-4 py-2 text-sm font-medium disabled:opacity-50"
+                        className="shrink-0 rounded-[8px] px-4 py-2 text-sm font-medium disabled:opacity-50"
                         style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
                       >
                         {redeemedSaving ? "Saving…" : redeemedJustSaved ? "Saved!" : "Save"}
@@ -1249,6 +1277,76 @@ export default function PortalShell({
                         initialNominees={nomineesByObligation[o.id] ?? []}
                       />
                     )}
+                  </Card>
+                );
+              })}
+
+              {view.eventSections.map((section) => {
+                // Same shared redeemedDraft/redeemedSaved state the Tickets
+                // & assets tab uses — checking this box here toggles every
+                // one of this event's tickets at once, and it reads as
+                // checked only once all of them are, so the two tabs never
+                // disagree about where things stand.
+                const eventTickets = view.ticketItems.filter((d) => d.events.includes(section.event));
+                if (eventTickets.length === 0) return null;
+                const allRedeemed = eventTickets.every((d) => redeemedDraft[d.id]);
+                const redeemBy = eventTickets
+                  .map((d) => d.dueDate)
+                  .filter((d): d is string => !!d)
+                  .sort()
+                  .at(-1);
+                const totalPasses = eventTickets.reduce((sum, d) => sum + (d.quantity ?? 1), 0);
+                return (
+                  <Card key={`redeem-${section.event}`}>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={allRedeemed}
+                        onChange={(e) => {
+                          const next = e.target.checked;
+                          setRedeemedDraft((prev) => {
+                            const updated = { ...prev };
+                            for (const d of eventTickets) updated[d.id] = next;
+                            return updated;
+                          });
+                        }}
+                        className="mt-0.5 h-4 w-4 shrink-0"
+                        style={{ accentColor: "var(--accent)" }}
+                      />
+                      <div className="w-full">
+                        <div className="text-[14px] font-medium text-fg-1">
+                          Redeem your included tickets for {section.eventLabel}
+                        </div>
+                        <div className="text-[12.5px] text-fg-4 leading-[1.5]">
+                          {totalPasses} pass{totalPasses === 1 ? "" : "es"}
+                          {redeemBy ? ` · redeem by ${formatDate(redeemBy)}` : ""}
+                        </div>
+                        <div className="mt-1.5 text-[11px] text-fg-5 leading-[1.4]">
+                          Only tick this once you&apos;ve actually redeemed every pass using the
+                          codes under Tickets &amp; assets, then hit Save — checking it there or
+                          here keeps both in sync.
+                        </div>
+                      </div>
+                    </label>
+                    <div className="flex items-center justify-between gap-3 pt-1 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setTab("assets")}
+                        className="text-[12.5px] font-medium"
+                        style={{ color: "var(--accent)" }}
+                      >
+                        View redemption codes →
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveRedeemed}
+                        disabled={!redeemedDirty || redeemedSaving}
+                        className="shrink-0 rounded-[8px] px-4 py-2 text-sm font-medium disabled:opacity-50"
+                        style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
+                      >
+                        {redeemedSaving ? "Saving…" : redeemedJustSaved ? "Saved!" : "Save"}
+                      </button>
+                    </div>
                   </Card>
                 );
               })}
