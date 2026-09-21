@@ -493,7 +493,16 @@ export default function PortalShell({
                 </div>
                 <div
                   className="grid gap-[18px] items-start"
-                  style={{ gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))" }}
+                  style={{
+                    // A single-event partner's card shouldn't stretch to
+                    // fill the whole row — keep it the same width it'd have
+                    // as one of two columns instead of ballooning to full
+                    // page width.
+                    gridTemplateColumns:
+                      view.eventSections.length > 1
+                        ? "repeat(auto-fit, minmax(360px, 1fr))"
+                        : "minmax(0, 560px)",
+                  }}
                 >
                   {view.eventSections.map((section) => (
                     <div

@@ -26,6 +26,16 @@ export interface ScheduledDeadline {
   appliesTo: DeadlineAudience;
   hard: boolean;
   events: EventName[];
+  /**
+   * Marks a deadline that has a real, per-partner completion signal
+   * elsewhere in the app — currently only "brandAssets" (logo/website
+   * URL/description, tracked in lib/brand-assets.ts). When set,
+   * lib/portal-view.ts's "What we need from you" summary narrows this
+   * item's wording to only what's still missing, or drops it entirely once
+   * everything's in, instead of showing it purely by date like every other
+   * entry here (which have no such signal to check).
+   */
+  trackedBy?: "brandAssets";
 }
 
 export const SCHEDULED_DEADLINES: ScheduledDeadline[] = [
@@ -36,6 +46,7 @@ export const SCHEDULED_DEADLINES: ScheduledDeadline[] = [
     appliesTo: "everyone",
     hard: false,
     events: ["DTM27"],
+    trackedBy: "brandAssets",
   },
   {
     date: "2027-02-22",

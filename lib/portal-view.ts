@@ -302,12 +302,44 @@ const WORKSTREAM_ORDER: Workstream[] = [
   "Marketing & Comms",
 ];
 
+/** Real per-partner completion state for the one deadline tagged `trackedBy: "brandAssets"` — see lib/brand-assets.ts. */
+export interface BrandAssetsCompletion {
+  hasLogo: boolean;
+  hasWebsiteUrl: boolean;
+  hasDescription: boolean;
+}
+
+/**
+ * Narrows a `trackedBy: "brandAssets"` deadline's wording to only what's
+ * still missing — `null` once everything's in (the item should be dropped
+ * entirely), the original Notion-sourced wording unchanged if nothing's
+ * been submitted yet (no need to invent different copy for that case), and
+ * a shortened "Submit your X" only once the partner has made partial
+ * progress.
+ */
+function narrowBrandAssetsDeadline(completion: BrandAssetsCompletion, originalText: string): string | null {
+  const missing: string[] = [];
+  if (!completion.hasLogo) missing.push("logo");
+  if (!completion.hasWebsiteUrl) missing.push("click-through URL");
+  if (!completion.hasDescription) missing.push("company description");
+  if (missing.length === 0) return null;
+  if (missing.length === 3) return originalText;
+  if (missing.length === 1) return `Submit your ${missing[0]}`;
+  const last = missing[missing.length - 1];
+  return `Submit your ${missing.slice(0, -1).join(", ")} and ${last}`;
+}
+
 export function buildPortalView(
   portal: PortalDetail,
   links: Pick<PortalContentFields, "hotelBookingUrl" | "floorPlanUrls"> = {
     hotelBookingUrl: null,
     floorPlanUrls: {},
   },
+  // Defaults to "nothing submitted yet" so callers that don't pass this
+  // (e.g. the staff admin page, which never renders "What we need from
+  // you") get the same wording SCHEDULED_DEADLINES already declares,
+  // rather than silently hiding the item.
+  brandAssetsCompletion: BrandAssetsCompletion = { hasLogo: false, hasWebsiteUrl: false, hasDescription: false },
 ): PortalView {
   const deliverables = portal.deliverables;
 
@@ -392,9 +424,22 @@ export function buildPortalView(
   // every ScheduledDeadline.date uses, so a plain string comparison works.
   const todayIso = new Date().toISOString().slice(0, 10);
 
-  /** The Overview tab's "What we need from you" summary — same real, audience-filtered deadlines as the Key Dates tab, narrowed to ones that haven't passed yet. */
+  /**
+   * The Overview tab's "What we need from you" summary — same real,
+   * audience-filtered deadlines as the Key Dates tab, narrowed to ones that
+   * haven't passed yet. Unlike Key Dates (the full staff audit view, which
+   * intentionally keeps showing every applicable deadline regardless of
+   * completion), a `trackedBy: "brandAssets"` deadline here reflects
+   * whether the partner has actually done it — narrowed to just what's
+   * left, or dropped once nothing is.
+   */
   const upcomingActionItems: UpcomingActionItem[] = applicableDeadlines
     .filter((d) => d.date >= todayIso)
+    .flatMap((d) => {
+      if (d.trackedBy !== "brandAssets") return [d];
+      const remaining = narrowBrandAssetsDeadline(brandAssetsCompletion, d.what);
+      return remaining === null ? [] : [{ ...d, what: remaining }];
+    })
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((d) => ({
       id: `${d.date}-${d.what}`,
