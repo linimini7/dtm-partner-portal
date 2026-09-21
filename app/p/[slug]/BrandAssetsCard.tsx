@@ -71,23 +71,14 @@ export default function BrandAssetsCard({
               Your logo, a short description and your website.
             </div>
           </div>
-          <div className="flex items-start gap-3">
-            {deadline && (
-              <div className="text-right">
-                <div className="eyebrow">Submit by</div>
-                <div className="font-mono text-[13px] font-semibold" style={{ color: "var(--warn)" }}>
-                  {formatDate(deadline)}
-                </div>
+          {deadline && (
+            <div className="text-right">
+              <div className="eyebrow">Submit by</div>
+              <div className="font-mono text-[13px] font-semibold" style={{ color: "var(--warn)" }}>
+                {formatDate(deadline)}
               </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="rounded-[8px] border border-dtm-hairline px-3 py-1.5 text-sm text-fg-2 whitespace-nowrap"
-            >
-              Edit
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-1">
@@ -140,6 +131,16 @@ export default function BrandAssetsCard({
           ) : (
             <span className="text-sm text-fg-5">Not added yet</span>
           )}
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="rounded-[8px] border border-dtm-hairline px-4 py-2 text-sm font-medium text-fg-2 whitespace-nowrap"
+          >
+            Edit
+          </button>
         </div>
       </div>
     );

@@ -50,11 +50,7 @@ export default async function PortalPage({
   const salesLead = portal.salesLeadId ? staff[portal.salesLeadId] : undefined;
   const portalContent = await getEffectivePortalContent(slug);
   const brandAssets = await getBrandAssets(slug);
-  const view = buildPortalView(portal, portalContent, {
-    hasLogo: brandAssets.logoSlots.some((s) => s.hasImage),
-    hasWebsiteUrl: Boolean(brandAssets.websiteUrl),
-    hasDescription: Boolean(brandAssets.description),
-  });
+  const view = buildPortalView(portal, portalContent);
   const mediaKit = await getEffectiveMediaKit(slug);
   // Prefer a staff-confirmed Attio "poc" over whatever email-ingestion
   // picked up on its own — same precedence admin/page.tsx uses. Phone has no

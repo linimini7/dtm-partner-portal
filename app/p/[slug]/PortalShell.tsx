@@ -190,6 +190,38 @@ export default function PortalShell({
     }
   }
 
+  // Ticket redemption checkboxes deliberately don't persist on every click
+  // (unlike the Action Items obligations above) — a stray click here would
+  // silently mark a real pass as redeemed with no confirmation, so this
+  // holds a local draft until "Save" is pressed, same shape as
+  // BrandAssetsCard's edit-then-save flow.
+  const initialRedeemed = Object.fromEntries(
+    view.ticketItems.map((d) => [d.id, checkedObligationIds.includes(`ticket-${d.id}`)]),
+  );
+  const [redeemedDraft, setRedeemedDraft] = useState<Record<string, boolean>>(initialRedeemed);
+  const [redeemedSaved, setRedeemedSaved] = useState<Record<string, boolean>>(initialRedeemed);
+  const [redeemedSaving, setRedeemedSaving] = useState(false);
+  const [redeemedJustSaved, setRedeemedJustSaved] = useState(false);
+  const redeemedDirty = view.ticketItems.some((d) => redeemedDraft[d.id] !== redeemedSaved[d.id]);
+
+  async function handleSaveRedeemed() {
+    setRedeemedSaving(true);
+    try {
+      await Promise.all(
+        view.ticketItems
+          .filter((d) => redeemedDraft[d.id] !== redeemedSaved[d.id])
+          .map((d) =>
+            toggleObligationChecked(slug, `ticket-${d.id}`, `Redeemed: ${d.name}`, Boolean(redeemedDraft[d.id])),
+          ),
+      );
+      setRedeemedSaved(redeemedDraft);
+      setRedeemedJustSaved(true);
+      setTimeout(() => setRedeemedJustSaved(false), 2000);
+    } finally {
+      setRedeemedSaving(false);
+    }
+  }
+
   const visibleTabs = view.tabs.filter((t) => !t.staffOnly || isStaff);
   const partnerTabs = visibleTabs.filter((t) => !t.staffOnly);
   const staffTabs = visibleTabs.filter((t) => t.staffOnly);
@@ -197,6 +229,25 @@ export default function PortalShell({
   const phases = Array.from(new Set(view.deliverableChecklist.map((a) => a.phase)));
   const visibleChecklist =
     filter === "All" ? view.deliverableChecklist : view.deliverableChecklist.filter((a) => a.phase === filter);
+
+  /**
+   * Overview's "What we need from you" is exactly the Action Items tab's
+   * open obligations — real partner deliverables (logo, announce,
+   * Guardians, named-attendee seats), not DTM's own internal calendar
+   * milestones (booth logistics, add-on selection, etc.), which used to
+   * bloat this list with things the partner doesn't actually submit. "logo"
+   * uses the same three-part brandAssets check the Action Items tab shows;
+   * everything else uses the same persisted checkbox.
+   */
+  const openPartnerObligations = view.partnerObligations.filter((o) => {
+    if (o.id === "logo") {
+      const hasLogo = brandAssets.logoSlots.some((s) => s.hasImage);
+      const hasWebsite = Boolean(brandAssets.websiteUrl);
+      const hasDescription = Boolean(brandAssets.description);
+      return !(hasLogo && hasWebsite && hasDescription);
+    }
+    return !obligationChecks[o.id];
+  });
 
   // Real, persisted nominee count (see NomineeEditor) — labeled "nominated"
   // rather than "confirmed" since confirmation happens later, outside the
@@ -625,7 +676,7 @@ export default function PortalShell({
 
         {tab === "overview" && (
           <div className="flex flex-col gap-5">
-            {view.upcomingActionItems.length > 0 && (
+            {openPartnerObligations.length > 0 && (
               <div
                 className="rounded-[13px] overflow-hidden flex flex-col"
                 style={{
@@ -643,11 +694,7 @@ export default function PortalShell({
                       What we need from you
                     </div>
                     <div className="text-[12.5px] text-fg-3">
-                      {view.upcomingActionItems.length === 1
-                        ? "One open item."
-                        : `${view.upcomingActionItems.length} open items${
-                            view.upcomingActionItems.length > 3 ? ", soonest three below." : "."
-                          }`}{" "}
+                      {openPartnerObligations.length === 1 ? "One open item." : `${openPartnerObligations.length} open items.`}{" "}
                       The rest of this portal is reference — this part is not.
                     </div>
                   </div>
@@ -657,32 +704,19 @@ export default function PortalShell({
                     className="shrink-0 rounded-[7px] px-[15px] py-[10px] font-mono text-[10px] tracking-[0.12em] uppercase"
                     style={{ background: "var(--warn)", color: "var(--dtm-ink)" }}
                   >
-                    {view.upcomingActionItems.length > 3
-                      ? `All ${view.upcomingActionItems.length} items →`
-                      : "All action items →"}
+                    Action items →
                   </button>
                 </div>
                 <div className="flex flex-col">
-                  {view.upcomingActionItems.slice(0, 3).map((item) => (
+                  {openPartnerObligations.map((o) => (
                     <div
-                      key={item.id}
+                      key={o.id}
                       className="flex items-center justify-between gap-4 flex-wrap p-[10px_22px]"
                       style={{ borderBottom: "1px solid var(--dtm-surface-2)" }}
                     >
                       <div className="min-w-0" style={{ flex: "1 1 280px" }}>
-                        <div className="text-[13.5px] font-medium text-fg-1">{item.title}</div>
-                      </div>
-                      <Chip color={item.chipColor} bg={`${item.chipColor}16`}>
-                        {item.eventTag}
-                      </Chip>
-                      <div className="flex flex-col gap-0.5 text-right shrink-0" style={{ minWidth: 92 }}>
-                        <div
-                          className="font-mono text-[12.5px] font-medium"
-                          style={{ color: item.daysAway <= 60 ? "var(--warn)" : "var(--fg-2)" }}
-                        >
-                          {formatDate(item.date)}
-                        </div>
-                        <div className="text-[10.5px] text-fg-5">in {item.daysAway} days</div>
+                        <div className="text-[13.5px] font-medium text-fg-1">{o.title}</div>
+                        <div className="text-[11.5px] text-fg-4">{o.note}</div>
                       </div>
                     </div>
                   ))}
@@ -906,7 +940,7 @@ export default function PortalShell({
                             className="font-mono text-[13px] font-semibold"
                             style={{ color: "var(--warn)" }}
                           >
-                            {redeemBy}
+                            {formatDate(redeemBy)}
                           </div>
                         </div>
                       )
@@ -920,9 +954,7 @@ export default function PortalShell({
                   <div className="flex flex-col gap-2.5">
                     {view.ticketItems.map((d) => {
                       const code = ticketCodes[d.id];
-                      const redeemedId = `ticket-${d.id}`;
-                      const redeemed = Boolean(obligationChecks[redeemedId]);
-                      const redeemedPending = obligationPending === redeemedId;
+                      const redeemed = Boolean(redeemedDraft[d.id]);
                       return (
                         <div
                           key={d.id}
@@ -949,20 +981,28 @@ export default function PortalShell({
                             <input
                               type="checkbox"
                               checked={redeemed}
-                              disabled={redeemedPending}
                               onChange={(e) =>
-                                handleObligationToggle(redeemedId, `Redeemed: ${d.name}`, e.target.checked)
+                                setRedeemedDraft((prev) => ({ ...prev, [d.id]: e.target.checked }))
                               }
                               className="h-3.5 w-3.5 shrink-0"
                               style={{ accentColor: "var(--accent)" }}
                             />
-                            <span className="text-[12px] text-fg-3">
-                              {redeemedPending ? "Saving…" : redeemed ? "Redeemed ✓" : "Mark as redeemed"}
-                            </span>
+                            <span className="text-[12px] text-fg-3">Redeemed</span>
                           </label>
                         </div>
                       );
                     })}
+                    <div className="flex items-center justify-end gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSaveRedeemed}
+                        disabled={!redeemedDirty || redeemedSaving}
+                        className="rounded-[8px] px-4 py-2 text-sm font-medium disabled:opacity-50"
+                        style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
+                      >
+                        {redeemedSaving ? "Saving…" : redeemedJustSaved ? "Saved!" : "Save"}
+                      </button>
+                    </div>
                   </div>
                 )}
 

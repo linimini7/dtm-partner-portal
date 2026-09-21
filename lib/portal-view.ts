@@ -49,9 +49,6 @@ export function eventAccentVar(event: EventName): string {
   return event === "SPARTA 2027" ? "#7A5CF0" : "#D4367A";
 }
 
-/** Neutral chip color for something that applies to every scoped event at once (no single event color fits) — matches the mockup's grey "BOTH" tag. */
-export const NEUTRAL_EVENT_COLOR = "#7A7A88";
-
 /**
  * One event's card on the Overview tab — a partner sponsoring both DTM27 and
  * SPARTA27 (e.g. APEX Ventures) gets one of these per event, each with its
@@ -73,19 +70,6 @@ export interface EventOverviewSection {
   /** Website / Floor plan / Hotel booking — practical links only; dates/location/context are their own fields above instead of being mixed into this list. */
   practicalLinks: PackageRow[];
   glanceRows: PackageRow[];
-}
-
-/** One calendar deadline that's still upcoming and applies to this partner — the Overview tab's "What we need from you" summary. Real data only: sourced from the same audience-filtered SCHEDULED_DEADLINES as the Key Dates tab, never invented per-item copy. */
-export interface UpcomingActionItem {
-  id: string;
-  title: string;
-  date: string;
-  daysAway: number;
-  hard: boolean;
-  /** Short event label this deadline applies to, e.g. "DTM27" — or "BOTH" when it spans every scoped event. Reflects ScheduledDeadline.events, not a guess. */
-  eventTag: string;
-  /** Matches eventTag: that event's accent color, or NEUTRAL_EVENT_COLOR for "BOTH". */
-  chipColor: string;
 }
 
 export interface KeyDateRow {
@@ -212,10 +196,8 @@ export interface PortalView {
   boothItems: Deliverable[];
   /** Every DTM-owed deliverable, for the staff-only Key Dates checklist. */
   deliverableChecklist: ActionItem[];
-  /** What the partner owes DTM — the partner-visible Action Items tab. */
+  /** What the partner owes DTM — the partner-visible Action Items tab AND the Overview tab's "What we need from you" summary (the same list, filtered to what's still open — see PortalShell). */
   partnerObligations: PartnerObligation[];
-  /** Upcoming calendar deadlines that apply to this partner, soonest first — the Overview tab's "What we need from you" summary. Empty once every applicable deadline has passed. */
-  upcomingActionItems: UpcomingActionItem[];
   /** The real submit-by date for logo/website/description (the one ScheduledDeadline tagged `trackedBy: "brandAssets"`), for the "Tickets & assets" tab's BrandAssetsCard — null if no such deadline applies to this partner's scoped events. */
   brandAssetsDeadline: string | null;
   workstreamsPresent: string[];
@@ -304,44 +286,12 @@ const WORKSTREAM_ORDER: Workstream[] = [
   "Marketing & Comms",
 ];
 
-/** Real per-partner completion state for the one deadline tagged `trackedBy: "brandAssets"` — see lib/brand-assets.ts. */
-export interface BrandAssetsCompletion {
-  hasLogo: boolean;
-  hasWebsiteUrl: boolean;
-  hasDescription: boolean;
-}
-
-/**
- * Narrows a `trackedBy: "brandAssets"` deadline's wording to only what's
- * still missing — `null` once everything's in (the item should be dropped
- * entirely), the original Notion-sourced wording unchanged if nothing's
- * been submitted yet (no need to invent different copy for that case), and
- * a shortened "Submit your X" only once the partner has made partial
- * progress.
- */
-function narrowBrandAssetsDeadline(completion: BrandAssetsCompletion, originalText: string): string | null {
-  const missing: string[] = [];
-  if (!completion.hasLogo) missing.push("logo");
-  if (!completion.hasWebsiteUrl) missing.push("click-through URL");
-  if (!completion.hasDescription) missing.push("company description");
-  if (missing.length === 0) return null;
-  if (missing.length === 3) return originalText;
-  if (missing.length === 1) return `Submit your ${missing[0]}`;
-  const last = missing[missing.length - 1];
-  return `Submit your ${missing.slice(0, -1).join(", ")} and ${last}`;
-}
-
 export function buildPortalView(
   portal: PortalDetail,
   links: Pick<PortalContentFields, "hotelBookingUrl" | "floorPlanUrls"> = {
     hotelBookingUrl: null,
     floorPlanUrls: {},
   },
-  // Defaults to "nothing submitted yet" so callers that don't pass this
-  // (e.g. the staff admin page, which never renders "What we need from
-  // you") get the same wording SCHEDULED_DEADLINES already declares,
-  // rather than silently hiding the item.
-  brandAssetsCompletion: BrandAssetsCompletion = { hasLogo: false, hasWebsiteUrl: false, hasDescription: false },
 ): PortalView {
   const deliverables = portal.deliverables;
 
@@ -422,41 +372,10 @@ export function buildPortalView(
     hard: d.hard,
   }));
 
-  // Today's date as an ISO string (UTC) — matches the YYYY-MM-DD format
-  // every ScheduledDeadline.date uses, so a plain string comparison works.
-  const todayIso = new Date().toISOString().slice(0, 10);
-
-  /**
-   * The Overview tab's "What we need from you" summary — same real,
-   * audience-filtered deadlines as the Key Dates tab, narrowed to ones that
-   * haven't passed yet. Unlike Key Dates (the full staff audit view, which
-   * intentionally keeps showing every applicable deadline regardless of
-   * completion), a `trackedBy: "brandAssets"` deadline here reflects
-   * whether the partner has actually done it — narrowed to just what's
-   * left, or dropped once nothing is.
-   */
-  const upcomingActionItems: UpcomingActionItem[] = applicableDeadlines
-    .filter((d) => d.date >= todayIso)
-    .flatMap((d) => {
-      if (d.trackedBy !== "brandAssets") return [d];
-      const remaining = narrowBrandAssetsDeadline(brandAssetsCompletion, d.what);
-      return remaining === null ? [] : [{ ...d, what: remaining }];
-    })
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map((d) => ({
-      id: `${d.date}-${d.what}`,
-      title: d.what,
-      date: d.date,
-      daysAway: daysUntil(d.date),
-      hard: d.hard,
-      eventTag: d.events.length > 1 ? "BOTH" : d.events[0] === "SPARTA 2027" ? "SPARTA27" : d.events[0],
-      chipColor: d.events.length > 1 ? NEUTRAL_EVENT_COLOR : eventAccentVar(d.events[0]),
-    }));
-
-  // The real deadline for "What we need from you" (logo/website/description)
-  // — shown as a "Submit by" badge the same way the tickets card shows
-  // "Redeem by", regardless of whether it's already complete (an empty
-  // upcomingActionItems entry for it just means nothing's missing anymore).
+  // The real deadline for logo/website/description — shown as a "Submit by"
+  // badge the same way the tickets card shows "Redeem by", regardless of
+  // whether it's already complete (completion is tracked separately, off
+  // real brandAssets data — see PortalShell's openPartnerObligations).
   const brandAssetsDeadlineEntry = applicableDeadlines.find((d) => d.trackedBy === "brandAssets");
   const brandAssetsDeadline = brandAssetsDeadlineEntry ? brandAssetsDeadlineEntry.date : null;
 
@@ -555,7 +474,6 @@ export function buildPortalView(
     boothItems: booth,
     deliverableChecklist,
     partnerObligations,
-    upcomingActionItems,
     brandAssetsDeadline,
     workstreamsPresent: Array.from(new Set(deliverables.map((d) => d.workstream))).filter(Boolean),
     contractLink: portal.contractLink,
