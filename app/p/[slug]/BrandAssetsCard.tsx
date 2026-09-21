@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { updateBrandAll, type UpdateBrandAllResult } from "./brand-actions";
 import LogoSlotsField from "./LogoSlotsField";
 import type { BrandAssets } from "@/lib/brand-assets";
+import { formatDate } from "@/lib/format-date";
 
 const MAX_DESCRIPTION_WORDS = 250;
 
@@ -21,7 +22,16 @@ function wordCount(text: string): number {
  * is never a lingering Save button once something is saved, only "Edit" to
  * go again.
  */
-export default function BrandAssetsCard({ slug, brandAssets }: { slug: string; brandAssets: BrandAssets }) {
+export default function BrandAssetsCard({
+  slug,
+  brandAssets,
+  deadline,
+}: {
+  slug: string;
+  brandAssets: BrandAssets;
+  /** The real "submit by" date for logo/website/description, or null once nothing's missing — see lib/portal-view.ts's brandAssetsDeadline. */
+  deadline: string | null;
+}) {
   const [editing, setEditing] = useState(false);
   const [result, formAction, isPending] = useActionState(
     async (_prev: UpdateBrandAllResult | null, formData: FormData) => updateBrandAll(formData),
@@ -61,13 +71,23 @@ export default function BrandAssetsCard({ slug, brandAssets }: { slug: string; b
               Your logo, a short description and your website.
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="rounded-[8px] border border-dtm-hairline px-3 py-1.5 text-sm text-fg-2 whitespace-nowrap"
-          >
-            Edit
-          </button>
+          <div className="flex items-start gap-3">
+            {deadline && (
+              <div className="text-right">
+                <div className="eyebrow">Submit by</div>
+                <div className="font-mono text-[13px] font-semibold" style={{ color: "var(--warn)" }}>
+                  {formatDate(deadline)}
+                </div>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-[8px] border border-dtm-hairline px-3 py-1.5 text-sm text-fg-2 whitespace-nowrap"
+            >
+              Edit
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-1">

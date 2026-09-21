@@ -216,6 +216,8 @@ export interface PortalView {
   partnerObligations: PartnerObligation[];
   /** Upcoming calendar deadlines that apply to this partner, soonest first — the Overview tab's "What we need from you" summary. Empty once every applicable deadline has passed. */
   upcomingActionItems: UpcomingActionItem[];
+  /** The real submit-by date for logo/website/description (the one ScheduledDeadline tagged `trackedBy: "brandAssets"`), for the "Tickets & assets" tab's BrandAssetsCard — null if no such deadline applies to this partner's scoped events. */
+  brandAssetsDeadline: string | null;
   workstreamsPresent: string[];
   contractLink: string | null;
   contractSignedDate: string | null;
@@ -451,6 +453,13 @@ export function buildPortalView(
       chipColor: d.events.length > 1 ? NEUTRAL_EVENT_COLOR : eventAccentVar(d.events[0]),
     }));
 
+  // The real deadline for "What we need from you" (logo/website/description)
+  // — shown as a "Submit by" badge the same way the tickets card shows
+  // "Redeem by", regardless of whether it's already complete (an empty
+  // upcomingActionItems entry for it just means nothing's missing anymore).
+  const brandAssetsDeadlineEntry = applicableDeadlines.find((d) => d.trackedBy === "brandAssets");
+  const brandAssetsDeadline = brandAssetsDeadlineEntry ? brandAssetsDeadlineEntry.date : null;
+
   const keyDates: KeyDateRow[] = [
     ...deliverables
       .filter((d) => d.dueDate)
@@ -547,6 +556,7 @@ export function buildPortalView(
     deliverableChecklist,
     partnerObligations,
     upcomingActionItems,
+    brandAssetsDeadline,
     workstreamsPresent: Array.from(new Set(deliverables.map((d) => d.workstream))).filter(Boolean),
     contractLink: portal.contractLink,
     contractSignedDate: portal.contractSignedDate,

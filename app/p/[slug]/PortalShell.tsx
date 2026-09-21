@@ -8,6 +8,7 @@ import type { PortalContentFields } from "@/lib/portal-content";
 import { mediaKitEventSlug, type EventMediaKit, type MediaKitEvent } from "@/lib/media-kit";
 import type { BrandAssets } from "@/lib/brand-assets";
 import type { DtmContact } from "@/lib/dtm-contacts";
+import { formatDate } from "@/lib/format-date";
 import BrandAssetsCard from "./BrandAssetsCard";
 import ObligationLinksEditor from "./ObligationLinksEditor";
 import NomineeEditor from "./NomineeEditor";
@@ -75,16 +76,6 @@ function CopyTextButton({ text }: { text: string }) {
       {copied ? "Copied!" : "Copy"}
     </SmallButton>
   );
-}
-
-const SHORT_MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-/** "2027-02-09" -> "9 Feb 2027" — a fixed 3-letter month abbreviation, since Intl's "short" style inconsistently returns "Sept" instead of "Sep" depending on the runtime's ICU data. */
-function formatDate(iso: string): string {
-  const [year, month, day] = iso.split("-").map(Number);
-  return `${day} ${SHORT_MONTHS[month - 1]} ${year}`;
 }
 
 function Chip({ children, color, bg }: { children: React.ReactNode; color: string; bg?: string }) {
@@ -723,13 +714,7 @@ export default function PortalShell({
                 style={{ gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))" }}
               >
                 <div className="flex flex-col gap-3.5 min-w-0">
-                  <div>
-                    <div className="text-[17px] font-semibold text-fg-1">Your event</div>
-                    <div className="text-[12.5px] text-fg-4">
-                      Generated from your contracted deliverables. If anything here does not match
-                      your understanding, tell us straight away.
-                    </div>
-                  </div>
+                  <div className="text-[17px] font-semibold text-fg-1">Your event</div>
                   {renderEventCard(view.eventSections[0])}
                 </div>
                 <div className="flex flex-col gap-[18px] min-w-0">
@@ -739,13 +724,7 @@ export default function PortalShell({
               </div>
             ) : (
               <div className="flex flex-col gap-3.5">
-                <div>
-                  <div className="text-[17px] font-semibold text-fg-1">Your two events</div>
-                  <div className="text-[12.5px] text-fg-4">
-                    Generated from your contracted deliverables. If anything here does not match
-                    your understanding, tell us straight away.
-                  </div>
-                </div>
+                <div className="text-[17px] font-semibold text-fg-1">Your two events</div>
                 <div
                   className="grid gap-[18px] items-start"
                   style={{ gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))" }}
@@ -941,6 +920,9 @@ export default function PortalShell({
                   <div className="flex flex-col gap-2.5">
                     {view.ticketItems.map((d) => {
                       const code = ticketCodes[d.id];
+                      const redeemedId = `ticket-${d.id}`;
+                      const redeemed = Boolean(obligationChecks[redeemedId]);
+                      const redeemedPending = obligationPending === redeemedId;
                       return (
                         <div
                           key={d.id}
@@ -963,6 +945,21 @@ export default function PortalShell({
                               <span className="font-mono text-[12px] text-fg-5">Not yet generated</span>
                             )}
                           </div>
+                          <label className="flex items-center gap-2 border-t pt-2 cursor-pointer" style={{ borderColor: "var(--dtm-hairline)" }}>
+                            <input
+                              type="checkbox"
+                              checked={redeemed}
+                              disabled={redeemedPending}
+                              onChange={(e) =>
+                                handleObligationToggle(redeemedId, `Redeemed: ${d.name}`, e.target.checked)
+                              }
+                              className="h-3.5 w-3.5 shrink-0"
+                              style={{ accentColor: "var(--accent)" }}
+                            />
+                            <span className="text-[12px] text-fg-3">
+                              {redeemedPending ? "Saving…" : redeemed ? "Redeemed ✓" : "Mark as redeemed"}
+                            </span>
+                          </label>
                         </div>
                       );
                     })}
@@ -982,7 +979,7 @@ export default function PortalShell({
               </Card>
 
               <Card>
-                <BrandAssetsCard slug={slug} brandAssets={brandAssets} />
+                <BrandAssetsCard slug={slug} brandAssets={brandAssets} deadline={view.brandAssetsDeadline} />
               </Card>
 
               {view.eventSections.map((section) => {
