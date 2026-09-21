@@ -17,10 +17,10 @@ function wordCount(text: string): number {
  * "What we need from you" — the one card in the portal a partner can
  * actually write to, not just read (via their access-code session, same as
  * staff via /admin — both hit the same brand-actions.ts). It defaults to a
- * read-only view with an "Edit" button; clicking it reveals the live form,
- * and a successful Save drops straight back to the read-only view — there
- * is never a lingering Save button once something is saved, only "Edit" to
- * go again.
+ * read-only view with a "Submit" button under the deadline; clicking it
+ * reveals the live form, and a successful Save drops straight back to the
+ * read-only view — there is never a lingering Save button once something is
+ * saved, only "Submit" to go again.
  */
 export default function BrandAssetsCard({
   slug,
@@ -71,14 +71,23 @@ export default function BrandAssetsCard({
               Your logo, a short description and your website.
             </div>
           </div>
-          {deadline && (
-            <div className="text-right">
-              <div className="eyebrow">Submit by</div>
-              <div className="font-mono text-[13px] font-semibold" style={{ color: "var(--warn)" }}>
-                {formatDate(deadline)}
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            {deadline && (
+              <div className="text-right">
+                <div className="eyebrow">Submit by</div>
+                <div className="font-mono text-[13px] font-semibold" style={{ color: "var(--warn)" }}>
+                  {formatDate(deadline)}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-[8px] border border-dtm-hairline px-3 py-1.5 text-sm font-medium text-fg-2 whitespace-nowrap"
+            >
+              Submit
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-1">
@@ -107,16 +116,7 @@ export default function BrandAssetsCard({
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] text-fg-5">Logos</span>
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="rounded-[8px] border border-dtm-hairline px-3 py-1.5 text-sm font-medium text-fg-2 whitespace-nowrap"
-            >
-              Edit
-            </button>
-          </div>
+          <span className="text-[11px] text-fg-5">Logos</span>
           {filledLogos.length > 0 ? (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
               {filledLogos.map(({ slot }) => (

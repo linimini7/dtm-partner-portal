@@ -249,17 +249,28 @@ export default function PortalShell({
     return !obligationChecks[o.id];
   });
 
-  // The per-company sales lead (from Attio) and the global DTM contacts
-  // list (staff-editable on Global portal settings) started out as two
-  // independent sources — once the same person exists in both (e.g. Sarah
-  // is both a company's Attio sales lead AND added to dtmContacts so her
-  // "on maternal leave" status can be edited), showing both renders her
-  // twice. The dtmContacts entry wins when names match (it's the editable,
-  // up-to-date one); the Attio-only fallback only shows for a sales lead
-  // nobody's added to dtmContacts yet.
-  const salesLeadInDtmContacts = salesLead
-    ? dtmContacts.some((c) => c.name.trim().toLowerCase() === salesLead.name.trim().toLowerCase())
-    : false;
+  // dtmContacts mixes two different kinds of person: shared DTM-wide roles
+  // (Paul, "Head of Operations" — relevant to every partner) and per-company
+  // sales leads (role "Partnership" — relevant only to the one company
+  // they're actually assigned to in Attio). Without that split, every
+  // partner would see all four sales leads instead of just their own.
+  // "Partnership" is the marker: give a future sales-lead contact that
+  // exact role to get the same per-company filtering, and anything else
+  // (e.g. "Head of Operations") always shows to everyone.
+  const isSalesLeadRole = (role: string | null) => role?.trim().toLowerCase() === "partnership";
+  const matchedSalesLeadContact = salesLead
+    ? dtmContacts.find(
+        (c) => isSalesLeadRole(c.role) && c.name.trim().toLowerCase() === salesLead.name.trim().toLowerCase(),
+      )
+    : undefined;
+  // The Attio-only fallback only shows when this company's sales lead
+  // hasn't been added to dtmContacts yet — once they have, the editable
+  // entry above replaces it so editing their phone/status there is what
+  // the partner actually sees.
+  const showSalesLeadFallback = Boolean(salesLead) && !matchedSalesLeadContact;
+  const visibleDtmContacts = dtmContacts.filter(
+    (c) => !isSalesLeadRole(c.role) || c === matchedSalesLeadContact,
+  );
 
   // Real, persisted nominee count (see NomineeEditor) — labeled "nominated"
   // rather than "confirmed" since confirmation happens later, outside the
@@ -572,7 +583,7 @@ export default function PortalShell({
             style={{ border: "1px solid var(--dtm-hairline)", background: "var(--dtm-surface)" }}
           >
             <div className="eyebrow">Your DTM team</div>
-            {salesLead && !salesLeadInDtmContacts && (
+            {showSalesLeadFallback && salesLead && (
               <div className="flex flex-col gap-0.5">
                 <div className="text-[12.5px] font-medium text-fg-2">{salesLead.name}</div>
                 <div className="text-[11px] text-fg-4">Partnership</div>
@@ -585,7 +596,7 @@ export default function PortalShell({
                 </a>
               </div>
             )}
-            {dtmContacts.map((c) => (
+            {visibleDtmContacts.map((c) => (
               <div key={c.id} className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <div className="text-[12.5px] font-medium text-fg-2">{c.name}</div>
