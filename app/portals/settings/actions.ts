@@ -9,7 +9,6 @@ import {
   upsertExhibitorGuidelinesUrl,
   upsertFloorPlanUrl,
   upsertHotelBookingUrl,
-  upsertPlatformUrl,
   type MediaKitEvent,
 } from "@/lib/portal-content";
 import { addDtmContact, deleteDtmContact, updateDtmContact } from "@/lib/dtm-contacts";
@@ -28,12 +27,6 @@ export async function updateGlobalExhibitorGuidelines(formData: FormData) {
     String(formData.get("exhibitorGuidelinesUrl") ?? "").trim() || null,
     email,
   );
-  revalidatePath("/", "layout");
-}
-
-export async function updateGlobalPlatformUrl(formData: FormData) {
-  const email = await requireStaffEmail();
-  await upsertPlatformUrl("global", String(formData.get("platformUrl") ?? "").trim() || null, email);
   revalidatePath("/", "layout");
 }
 

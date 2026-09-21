@@ -13,7 +13,6 @@ import {
   updateGlobalFloorPlanUrl,
   updateGlobalHotelBookingUrl,
   updateGlobalMediaKit,
-  updateGlobalPlatformUrl,
 } from "./actions";
 
 export default async function PortalSettingsPage() {
@@ -214,33 +213,6 @@ export default async function PortalSettingsPage() {
                 style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
               >
                 Save exhibitor guidelines URL
-              </button>
-            </form>
-          </div>
-
-          <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6">
-            <p className="eyebrow mb-2">DTM27 platform</p>
-            <p className="mb-4 text-sm text-fg-4">
-              The link every partner sees under &quot;Coming your way&quot; → DTM27 platform.
-              Changing it updates it for every partner immediately.
-            </p>
-            <form action={updateGlobalPlatformUrl} className="space-y-4">
-              <label className="block text-sm">
-                <span className="mb-1 block text-fg-3">DTM27 platform URL</span>
-                <input
-                  type="url"
-                  name="platformUrl"
-                  defaultValue={content.platformUrl ?? ""}
-                  placeholder="https://…"
-                  className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
-                />
-              </label>
-              <button
-                type="submit"
-                className="rounded-[8px] px-4 py-2 text-sm font-medium"
-                style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
-              >
-                Save DTM27 platform URL
               </button>
             </form>
           </div>

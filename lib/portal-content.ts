@@ -39,7 +39,6 @@ function floorPlanColumn(event: EventName): string {
 
 export interface PortalContentFields {
   exhibitorGuidelinesUrl: string | null;
-  platformUrl: string | null;
   /** "Coming your way" → Quick Links → Hotel booking. Global-only, same one link for every partner and every event — see the settings page copy. */
   hotelBookingUrl: string | null;
   /** Floor plan link per event, keyed by EventName — global-only, staff-set on Global portal settings. */
@@ -48,7 +47,6 @@ export interface PortalContentFields {
 
 interface ExhibitorRow {
   exhibitor_guidelines_url: string | null;
-  platform_url: string | null;
   hotel_booking_url: string | null;
   floor_plan_dtm27_url: string | null;
   floor_plan_sparta27_url: string | null;
@@ -60,7 +58,6 @@ function rowToFields(row: ExhibitorRow | undefined): PortalContentFields {
   if (row?.floor_plan_sparta27_url) floorPlanUrls["SPARTA 2027"] = row.floor_plan_sparta27_url;
   return {
     exhibitorGuidelinesUrl: row?.exhibitor_guidelines_url ?? null,
-    platformUrl: row?.platform_url ?? null,
     hotelBookingUrl: row?.hotel_booking_url ?? null,
     floorPlanUrls,
   };
@@ -69,7 +66,7 @@ function rowToFields(row: ExhibitorRow | undefined): PortalContentFields {
 /** The raw stored links for one scope ('global' or a slug) — used by admin forms so staff can see exactly what's overridden vs inherited. */
 export async function getRawPortalContent(scope: string): Promise<PortalContentFields> {
   const { rows } = await getPool().query<ExhibitorRow>(
-    `SELECT exhibitor_guidelines_url, platform_url, hotel_booking_url,
+    `SELECT exhibitor_guidelines_url, hotel_booking_url,
             floor_plan_dtm27_url, floor_plan_sparta27_url
      FROM portal_content WHERE scope = $1`,
     [scope],
@@ -77,10 +74,10 @@ export async function getRawPortalContent(scope: string): Promise<PortalContentF
   return rowToFields(rows[0]);
 }
 
-/** What a given portal should actually show: per-slug override, falling back to the global default. Hotel booking and floor plans are global-only (same as platformUrl), but this keeps the same merge shape as exhibitorGuidelinesUrl in case that changes. */
+/** What a given portal should actually show: per-slug override, falling back to the global default. Hotel booking and floor plans are global-only, but this keeps the same merge shape as exhibitorGuidelinesUrl in case that changes. */
 export async function getEffectivePortalContent(slug: string): Promise<PortalContentFields> {
   const { rows } = await getPool().query<ExhibitorRow & { scope: string }>(
-    `SELECT scope, exhibitor_guidelines_url, platform_url, hotel_booking_url,
+    `SELECT scope, exhibitor_guidelines_url, hotel_booking_url,
             floor_plan_dtm27_url, floor_plan_sparta27_url
      FROM portal_content WHERE scope = $1 OR scope = 'global'`,
     [slug],
@@ -89,7 +86,6 @@ export async function getEffectivePortalContent(slug: string): Promise<PortalCon
   const override = rowToFields(rows.find((r) => r.scope === slug));
   return {
     exhibitorGuidelinesUrl: override.exhibitorGuidelinesUrl ?? global.exhibitorGuidelinesUrl,
-    platformUrl: override.platformUrl ?? global.platformUrl,
     hotelBookingUrl: override.hotelBookingUrl ?? global.hotelBookingUrl,
     floorPlanUrls: Object.keys(override.floorPlanUrls).length > 0 ? override.floorPlanUrls : global.floorPlanUrls,
   };
@@ -105,22 +101,6 @@ export async function upsertExhibitorGuidelinesUrl(
      VALUES ($1, $2, now(), $3)
      ON CONFLICT (scope) DO UPDATE SET
        exhibitor_guidelines_url = EXCLUDED.exhibitor_guidelines_url,
-       updated_at = now(),
-       updated_by = EXCLUDED.updated_by`,
-    [scope, url, updatedBy],
-  );
-}
-
-export async function upsertPlatformUrl(
-  scope: string,
-  url: string | null,
-  updatedBy: string,
-): Promise<void> {
-  await getPool().query(
-    `INSERT INTO portal_content (scope, platform_url, updated_at, updated_by)
-     VALUES ($1, $2, now(), $3)
-     ON CONFLICT (scope) DO UPDATE SET
-       platform_url = EXCLUDED.platform_url,
        updated_at = now(),
        updated_by = EXCLUDED.updated_by`,
     [scope, url, updatedBy],

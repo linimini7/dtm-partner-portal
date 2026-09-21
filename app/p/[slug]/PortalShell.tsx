@@ -221,6 +221,236 @@ export default function PortalShell({
     (d) => /confirm/i.test(d.what) && /(1:1|opt-in|meeting)/i.test(d.what),
   );
 
+  /** One event's card in "Your event(s)" — pulled out so a single-event partner's combined layout and a dual-event partner's side-by-side grid can share it instead of duplicating the markup. */
+  function renderEventCard(section: PortalView["eventSections"][number]) {
+    return (
+      <div
+        key={section.event}
+        className="rounded-[13px] overflow-hidden flex flex-col"
+        style={{
+          border: `1px solid ${section.accentVar}2E`,
+          background: "var(--dtm-surface)",
+        }}
+      >
+        <div
+          className="flex flex-col gap-3 p-[19px_20px]"
+          style={{
+            background: `linear-gradient(180deg, ${section.accentVar}14, ${section.accentVar}04)`,
+            borderBottom: `1px solid ${section.accentVar}24`,
+          }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-[2px] min-w-0">
+              <div
+                className="text-[27px] font-bold leading-[1.1] tracking-[-0.035em]"
+                style={{ color: section.accentVar }}
+              >
+                {section.eventLabel}
+              </div>
+              <div className="text-[12.5px] text-fg-2 leading-[1.3]">{section.dateLine}</div>
+              <div className="text-[12px] text-fg-4 leading-[1.3]">{section.location}</div>
+            </div>
+            {section.daysAway !== null && (
+              <div className="flex flex-col gap-[2px] text-right shrink-0">
+                <div
+                  className="text-[27px] font-bold leading-[1.1] tracking-[-0.035em]"
+                  style={{ color: section.accentVar }}
+                >
+                  {section.daysAway}
+                </div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.13em] text-fg-4">
+                  Days away
+                </div>
+              </div>
+            )}
+          </div>
+          {section.context && (
+            <div
+              className="text-[12.5px] text-fg-3 leading-[1.55] pt-[11px]"
+              style={{ borderTop: "1px solid var(--dtm-hairline)" }}
+            >
+              {section.context}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-[11px] p-[18px_20px]">
+          <div className="eyebrow">What you get</div>
+          {section.glanceRows.length === 0 ? (
+            <div className="text-[12.5px] text-fg-4">
+              Deliverables not yet exploded in Attio.
+            </div>
+          ) : (
+            section.glanceRows.map((row) => <KV key={row.label} {...row} />)
+          )}
+        </div>
+        <div className="flex flex-col gap-[9px] p-[4px_20px_18px]">
+          <div className="eyebrow">Practical</div>
+          {section.practicalLinks.map((row, j) => (
+            <KV key={row.label + j} {...row} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const experienceHeading = view.hasGuardian
+    ? "Make your experience at DTM count"
+    : "Make your experience at SPARTA27 count";
+
+  // No hardcoded max-width here (unlike the pre-existing standalone
+  // rendering below) — a single-event partner's combined two-column layout
+  // sizes this off its own grid column instead, per the conversation this
+  // was fixed in ("make it relative, don't fix it").
+  const experienceCardsNode = view.hasGuardian ? (
+    <div
+      className="grid gap-[18px] items-start"
+      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}
+    >
+      <Card
+        style={{
+          border: "1px solid rgb(79 169 122 / 28%)",
+          background: "linear-gradient(180deg, rgb(79 169 122 / 7%), rgb(79 169 122 / 1.5%)), var(--dtm-surface)",
+        }}
+      >
+        <div className="flex justify-between items-start gap-2.5">
+          <div className="text-[16px] font-semibold tracking-[-0.015em] text-fg-1">
+            Become a Guardian Catalyst Partner
+          </div>
+          <Chip color="var(--ok)">Rolling</Chip>
+        </div>
+        <div className="text-[13px] text-fg-3 leading-[1.6]">
+          The Guardians of European Deep Tech is an invite-only cohort of
+          Europe&apos;s most senior corporate innovation leaders. As a partner you
+          can nominate Guardians from your network to join, and Guardians receive a
+          complimentary ticket to DTM.
+        </div>
+        <div
+          className="rounded-[10px] p-4 flex flex-col gap-[13px]"
+          style={{ border: "1px solid #1F1F27", background: "var(--dtm-ink)" }}
+        >
+          <div className="flex justify-between items-baseline gap-2.5">
+            <div className="eyebrow">Nominated Guardians</div>
+            <div className="font-mono text-[13px] text-fg-1">
+              {guardianNomineeCount} <span className="text-[#5A5A66]">/ {GUARDIAN_TARGET}</span>
+            </div>
+          </div>
+          <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "var(--dtm-hairline)" }}>
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${guardianProgressPct}%`, background: "var(--ok)" }}
+            />
+          </div>
+          <div className="text-[12.5px] text-fg-2 leading-[1.55]">
+            At 15 confirmed you unlock{" "}
+            <strong className="text-fg-1">4 curated 1:1 meetings</strong> and branding
+            as a <strong style={{ color: "var(--ok)" }}>Guardian Catalyst Partner</strong>.
+          </div>
+        </div>
+        <div className="text-[12px] text-fg-4 leading-[1.55]">
+          Guardians take time to confirm, so the earlier you nominate the better.
+          Someone from the DTM team will walk you through the programme.
+        </div>
+        <a
+          href="https://www.deeptech.build/guardian-program"
+          target="_blank"
+          rel="noreferrer"
+          className="font-mono text-[11px] tracking-[0.1em] uppercase"
+        >
+          Guardian Program →
+        </a>
+      </Card>
+
+      {view.hasMeet && (
+        <Card>
+          <div className="flex justify-between items-start gap-2.5">
+            <div className="text-[16px] font-semibold tracking-[-0.015em] text-fg-1">
+              Who do you want to meet{view.eventLabel ? ` at ${view.eventLabel}` : ""}?
+            </div>
+            <Chip color="#7A7A88" bg="#16161C">
+              Form coming soon
+            </Chip>
+          </div>
+          <div className="text-[13px] text-fg-3 leading-[1.6]">
+            We curate meetings around what you tell us. Let us know who you want to
+            meet and what your search fields are.
+          </div>
+          <div>
+            <KV
+              label="Curated 1:1s in your package"
+              values={[view.matchmakingItems.map((d) => d.name).join(", ") || "Not yet exploded in Attio"]}
+            />
+            {confirmMeetingsDeadline && (
+              <KV label="You confirm your picks by" values={[formatDate(confirmMeetingsDeadline.date)]} />
+            )}
+            <KV label="Curation runs" values={["Final two weeks"]} />
+          </div>
+          <div className="text-[12.5px] text-fg-4 leading-[1.55]">
+            In the meantime, reply to your point of contact with the companies,
+            roles and markets you are targeting.
+          </div>
+          <div className="text-xs text-fg-5 leading-[1.55]">
+            Both parties must opt in, so we cannot guarantee a specific meeting
+            takes place. Cancellations and no-shows are replaced.
+          </div>
+        </Card>
+      )}
+    </div>
+  ) : view.hasMeet ? (
+    <Card style={{ border: "1px solid rgb(234 179 8 / 35%)", background: "rgb(234 179 8 / 6%)" }}>
+      <div className="text-[15px] font-semibold text-fg-1">Your 1:1 meetings</div>
+      <div className="text-[13px] text-fg-3 leading-[1.6]">
+        SPARTA runs on 15-minute AI-matched, double opt-in 1:1 meetings. For most
+        partners this is the core of the day.
+      </div>
+      <div className="text-[13px] text-fg-2">
+        Three things decide whether they land well:
+      </div>
+      <ol className="flex flex-col gap-2 pl-4 list-decimal text-[13px] text-fg-3 leading-[1.5]">
+        <li>
+          <strong className="text-fg-1">Complete your platform profile</strong> the
+          moment you get access. It is what the matching runs on.
+        </li>
+        <li>
+          <strong className="text-fg-1">
+            Submit your search preferences before the freeze on 28 January 2027.
+          </strong>{" "}
+          After that, our team curates and preferences are locked.
+        </li>
+        <li>
+          <strong className="text-fg-1">
+            Confirm your scheduled meetings in your calendar by 9 February.
+          </strong>{" "}
+          Unconfirmed slots are reassigned so the room stays full.
+        </li>
+      </ol>
+      <div className="text-xs text-fg-5 leading-[1.55]">
+        Both parties must opt in, so we cannot guarantee a specific meeting takes
+        place. Cancellations and no-shows are replaced.
+      </div>
+    </Card>
+  ) : (
+    <Card>
+      <div className="text-[15px] font-semibold text-fg-1">
+        Who do you want to meet at SPARTA27?
+      </div>
+      <div className="text-[13px] text-fg-3 leading-[1.6]">
+        The room is armed forces, ministries of defence, procurement agencies,
+        primes, public defence institutions, DefTech and dual-use scaleups, and
+        funds.
+      </div>
+      <div className="text-[13px] text-fg-3 leading-[1.6]">
+        Tell us who you want to meet and what your search fields are, and we will
+        curate around it.
+      </div>
+      <div className="text-[12.5px] text-fg-4 leading-[1.55]">
+        <Chip color="var(--fg-5)" bg="var(--dtm-surface-2)">
+          Preference form coming with your platform access
+        </Chip>{" "}
+        Until then, reply to your point of contact.
+      </div>
+    </Card>
+  );
+
   return (
     <div
       className="min-h-screen grid text-fg-2"
@@ -480,12 +710,37 @@ export default function PortalShell({
                   </div>
                 </Card>
               </div>
+            ) : view.eventSections.length === 1 ? (
+              // A single-event partner gets one event card with nothing to
+              // sit beside it, which used to leave a fixed-width card
+              // floating in an otherwise-empty row and "Make your
+              // experience..." stranded in its own full-width section below
+              // — combined into one two-column row instead, each side
+              // sized off the grid column (relative), not a fixed pixel
+              // width, so it stops looking lopsided at any screen size.
+              <div
+                className="grid gap-[22px] items-start"
+                style={{ gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))" }}
+              >
+                <div className="flex flex-col gap-3.5 min-w-0">
+                  <div>
+                    <div className="text-[17px] font-semibold text-fg-1">Your event</div>
+                    <div className="text-[12.5px] text-fg-4">
+                      Generated from your contracted deliverables. If anything here does not match
+                      your understanding, tell us straight away.
+                    </div>
+                  </div>
+                  {renderEventCard(view.eventSections[0])}
+                </div>
+                <div className="flex flex-col gap-[18px] min-w-0">
+                  <div className="text-[17px] font-semibold text-fg-1">{experienceHeading}</div>
+                  {experienceCardsNode}
+                </div>
+              </div>
             ) : (
               <div className="flex flex-col gap-3.5">
                 <div>
-                  <div className="text-[17px] font-semibold text-fg-1">
-                    Your {view.eventSections.length > 1 ? "two events" : "event"}
-                  </div>
+                  <div className="text-[17px] font-semibold text-fg-1">Your two events</div>
                   <div className="text-[12.5px] text-fg-4">
                     Generated from your contracted deliverables. If anything here does not match
                     your understanding, tell us straight away.
@@ -493,258 +748,19 @@ export default function PortalShell({
                 </div>
                 <div
                   className="grid gap-[18px] items-start"
-                  style={{
-                    // A single-event partner's card shouldn't stretch to
-                    // fill the whole row — keep it the same width it'd have
-                    // as one of two columns instead of ballooning to full
-                    // page width.
-                    gridTemplateColumns:
-                      view.eventSections.length > 1
-                        ? "repeat(auto-fit, minmax(360px, 1fr))"
-                        : "minmax(0, 560px)",
-                  }}
+                  style={{ gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))" }}
                 >
-                  {view.eventSections.map((section) => (
-                    <div
-                      key={section.event}
-                      className="rounded-[13px] overflow-hidden flex flex-col"
-                      style={{
-                        border: `1px solid ${section.accentVar}2E`,
-                        background: "var(--dtm-surface)",
-                      }}
-                    >
-                      <div
-                        className="flex flex-col gap-3 p-[19px_20px]"
-                        style={{
-                          background: `linear-gradient(180deg, ${section.accentVar}14, ${section.accentVar}04)`,
-                          borderBottom: `1px solid ${section.accentVar}24`,
-                        }}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex flex-col gap-[2px] min-w-0">
-                            <div
-                              className="text-[27px] font-bold leading-[1.1] tracking-[-0.035em]"
-                              style={{ color: section.accentVar }}
-                            >
-                              {section.eventLabel}
-                            </div>
-                            <div className="text-[12.5px] text-fg-2 leading-[1.3]">{section.dateLine}</div>
-                            <div className="text-[12px] text-fg-4 leading-[1.3]">{section.location}</div>
-                          </div>
-                          {section.daysAway !== null && (
-                            <div className="flex flex-col gap-[2px] text-right shrink-0">
-                              <div
-                                className="text-[27px] font-bold leading-[1.1] tracking-[-0.035em]"
-                                style={{ color: section.accentVar }}
-                              >
-                                {section.daysAway}
-                              </div>
-                              <div className="font-mono text-[9px] uppercase tracking-[0.13em] text-fg-4">
-                                Days away
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        {section.context && (
-                          <div
-                            className="text-[12.5px] text-fg-3 leading-[1.55] pt-[11px]"
-                            style={{ borderTop: "1px solid var(--dtm-hairline)" }}
-                          >
-                            {section.context}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col gap-[11px] p-[18px_20px]">
-                        <div className="eyebrow">What you get</div>
-                        {section.glanceRows.length === 0 ? (
-                          <div className="text-[12.5px] text-fg-4">
-                            Deliverables not yet exploded in Attio.
-                          </div>
-                        ) : (
-                          section.glanceRows.map((row) => <KV key={row.label} {...row} />)
-                        )}
-                      </div>
-                      <div className="flex flex-col gap-[9px] p-[4px_20px_18px]">
-                        <div className="eyebrow">Practical</div>
-                        {section.practicalLinks.map((row, j) => (
-                          <KV key={row.label + j} {...row} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                  {view.eventSections.map((section) => renderEventCard(section))}
                 </div>
               </div>
             )}
 
-            {view.hasGuardian && (
+            {view.eventSections.length !== 1 && (
               <>
                 <div className="border-t border-dtm-hairline" />
                 <div className="flex flex-col gap-[18px]">
-                  <div className="text-[17px] font-semibold text-fg-1">
-                    Make your experience at DTM count
-                  </div>
-                  <div
-                    className="grid gap-[18px] items-start"
-                    style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}
-                  >
-                    <Card
-                      style={{
-                        border: "1px solid rgb(79 169 122 / 28%)",
-                        background: "linear-gradient(180deg, rgb(79 169 122 / 7%), rgb(79 169 122 / 1.5%)), var(--dtm-surface)",
-                      }}
-                    >
-                      <div className="flex justify-between items-start gap-2.5">
-                        <div className="text-[16px] font-semibold tracking-[-0.015em] text-fg-1">
-                          Become a Guardian Catalyst Partner
-                        </div>
-                        <Chip color="var(--ok)">Rolling</Chip>
-                      </div>
-                      <div className="text-[13px] text-fg-3 leading-[1.6]">
-                        The Guardians of European Deep Tech is an invite-only cohort of
-                        Europe&apos;s most senior corporate innovation leaders. As a partner you
-                        can nominate Guardians from your network to join, and Guardians receive a
-                        complimentary ticket to DTM.
-                      </div>
-                      <div
-                        className="rounded-[10px] p-4 flex flex-col gap-[13px]"
-                        style={{ border: "1px solid #1F1F27", background: "var(--dtm-ink)" }}
-                      >
-                        <div className="flex justify-between items-baseline gap-2.5">
-                          <div className="eyebrow">Nominated Guardians</div>
-                          <div className="font-mono text-[13px] text-fg-1">
-                            {guardianNomineeCount} <span className="text-[#5A5A66]">/ {GUARDIAN_TARGET}</span>
-                          </div>
-                        </div>
-                        <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "var(--dtm-hairline)" }}>
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${guardianProgressPct}%`, background: "var(--ok)" }}
-                          />
-                        </div>
-                        <div className="text-[12.5px] text-fg-2 leading-[1.55]">
-                          At 15 confirmed you unlock{" "}
-                          <strong className="text-fg-1">4 curated 1:1 meetings</strong> and branding
-                          as a <strong style={{ color: "var(--ok)" }}>Guardian Catalyst Partner</strong>.
-                        </div>
-                      </div>
-                      <div className="text-[12px] text-fg-4 leading-[1.55]">
-                        Guardians take time to confirm, so the earlier you nominate the better.
-                        Someone from the DTM team will walk you through the programme.
-                      </div>
-                      <a
-                        href="https://www.deeptech.build/guardian-program"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-mono text-[11px] tracking-[0.1em] uppercase"
-                      >
-                        Guardian Program →
-                      </a>
-                    </Card>
-
-                    {view.hasMeet && (
-                      <Card>
-                        <div className="flex justify-between items-start gap-2.5">
-                          <div className="text-[16px] font-semibold tracking-[-0.015em] text-fg-1">
-                            Who do you want to meet{view.eventLabel ? ` at ${view.eventLabel}` : ""}?
-                          </div>
-                          <Chip color="#7A7A88" bg="#16161C">
-                            Form coming soon
-                          </Chip>
-                        </div>
-                        <div className="text-[13px] text-fg-3 leading-[1.6]">
-                          We curate meetings around what you tell us. Let us know who you want to
-                          meet and what your search fields are.
-                        </div>
-                        <div>
-                          <KV
-                            label="Curated 1:1s in your package"
-                            values={[view.matchmakingItems.map((d) => d.name).join(", ") || "Not yet exploded in Attio"]}
-                          />
-                          {confirmMeetingsDeadline && (
-                            <KV label="You confirm your picks by" values={[formatDate(confirmMeetingsDeadline.date)]} />
-                          )}
-                          <KV label="Curation runs" values={["Final two weeks"]} />
-                        </div>
-                        <div className="text-[12.5px] text-fg-4 leading-[1.55]">
-                          In the meantime, reply to your point of contact with the companies,
-                          roles and markets you are targeting.
-                        </div>
-                        <div className="text-xs text-fg-5 leading-[1.55]">
-                          Both parties must opt in, so we cannot guarantee a specific meeting
-                          takes place. Cancellations and no-shows are replaced.
-                        </div>
-                      </Card>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {!view.hasGuardian && (
-              <>
-                <div className="border-t border-dtm-hairline" />
-                <div className="flex flex-col gap-[18px]">
-                  <div className="text-[17px] font-semibold text-fg-1">
-                    Make your experience at SPARTA27 count
-                  </div>
-                  {view.hasMeet ? (
-                    <Card
-                      className="max-w-[520px]"
-                      style={{ border: "1px solid rgb(234 179 8 / 35%)", background: "rgb(234 179 8 / 6%)" }}
-                    >
-                      <div className="text-[15px] font-semibold text-fg-1">Your 1:1 meetings</div>
-                      <div className="text-[13px] text-fg-3 leading-[1.6]">
-                        SPARTA runs on 15-minute AI-matched, double opt-in 1:1 meetings. For most
-                        partners this is the core of the day.
-                      </div>
-                      <div className="text-[13px] text-fg-2">
-                        Three things decide whether they land well:
-                      </div>
-                      <ol className="flex flex-col gap-2 pl-4 list-decimal text-[13px] text-fg-3 leading-[1.5]">
-                        <li>
-                          <strong className="text-fg-1">Complete your platform profile</strong> the
-                          moment you get access. It is what the matching runs on.
-                        </li>
-                        <li>
-                          <strong className="text-fg-1">
-                            Submit your search preferences before the freeze on 28 January 2027.
-                          </strong>{" "}
-                          After that, our team curates and preferences are locked.
-                        </li>
-                        <li>
-                          <strong className="text-fg-1">
-                            Confirm your scheduled meetings in your calendar by 9 February.
-                          </strong>{" "}
-                          Unconfirmed slots are reassigned so the room stays full.
-                        </li>
-                      </ol>
-                      <div className="text-xs text-fg-5 leading-[1.55]">
-                        Both parties must opt in, so we cannot guarantee a specific meeting takes
-                        place. Cancellations and no-shows are replaced.
-                      </div>
-                    </Card>
-                  ) : (
-                    <Card className="max-w-[520px]">
-                      <div className="text-[15px] font-semibold text-fg-1">
-                        Who do you want to meet at SPARTA27?
-                      </div>
-                      <div className="text-[13px] text-fg-3 leading-[1.6]">
-                        The room is armed forces, ministries of defence, procurement agencies,
-                        primes, public defence institutions, DefTech and dual-use scaleups, and
-                        funds.
-                      </div>
-                      <div className="text-[13px] text-fg-3 leading-[1.6]">
-                        Tell us who you want to meet and what your search fields are, and we will
-                        curate around it.
-                      </div>
-                      <div className="text-[12.5px] text-fg-4 leading-[1.55]">
-                        <Chip color="var(--fg-5)" bg="var(--dtm-surface-2)">
-                          Preference form coming with your platform access
-                        </Chip>{" "}
-                        Until then, reply to your point of contact.
-                      </div>
-                    </Card>
-                  )}
+                  <div className="text-[17px] font-semibold text-fg-1">{experienceHeading}</div>
+                  {view.hasGuardian ? experienceCardsNode : <div className="max-w-[520px]">{experienceCardsNode}</div>}
                 </div>
               </>
             )}
@@ -869,19 +885,13 @@ export default function PortalShell({
         {tab === "assets" && (() => {
           // Each "Coming your way" item moves out into its own box in the
           // main column the moment it actually has content — the right-hand
-          // card only ever lists what's still pending. "Your agenda" isn't
-          // wired to any real data yet (that feature doesn't exist), so it
-          // stays permanently pending — the card never fully disappears
-          // until agenda scheduling actually ships.
+          // card only ever lists what's still pending.
           const pendingMediaKitSections = view.eventSections.filter((section) => {
             const kit = mediaKit[section.event as MediaKitEvent];
             return !kit.hasImage && !kit.copy;
           });
           const guidelinesPending = view.hasBooth && !portalContent.exhibitorGuidelinesUrl;
-          const platformPending = !portalContent.platformUrl;
-          const agendaPending = true;
-          const hasPending =
-            pendingMediaKitSections.length > 0 || guidelinesPending || platformPending || agendaPending;
+          const hasPending = pendingMediaKitSections.length > 0 || guidelinesPending;
           const hasRightColumn = hasPending || view.hasBooth;
 
           return (
@@ -1039,21 +1049,6 @@ export default function PortalShell({
                 </Card>
               )}
 
-              {portalContent.platformUrl && (
-                <Card>
-                  <div className="flex justify-between items-center gap-2.5">
-                    <div className="text-[15px] font-semibold text-fg-1">DTM27 platform</div>
-                    <a href={portalContent.platformUrl} target="_blank" rel="noreferrer" className="text-sm">
-                      View ↗
-                    </a>
-                  </div>
-                  <div className="text-[12.5px] text-fg-4 leading-[1.55]">
-                    You will receive an invitation by email. Completing your profile is what drives
-                    your 1:1 matches.
-                  </div>
-                </Card>
-              )}
-
             </div>
 
             {hasRightColumn && (
@@ -1063,19 +1058,6 @@ export default function PortalShell({
                     <div>
                       <div className="text-[15px] font-semibold text-fg-1">Coming your way</div>
                       <div className="text-[12.5px] text-fg-4">We email you as each one lands.</div>
-                    </div>
-
-                    <div className="flex flex-col gap-2.5 pt-3.5" style={{ borderTop: "1px solid var(--dtm-hairline)" }}>
-                      <div className="flex justify-between items-center gap-2.5">
-                        <div className="text-[13.5px] font-semibold text-fg-1">Your agenda</div>
-                        <Chip color="var(--fg-5)" bg="var(--dtm-surface-2)">
-                          Coming soon
-                        </Chip>
-                      </div>
-                      <div className="text-[12.5px] text-fg-4 leading-[1.55]">
-                        Your individual schedule of sessions and talks — we will email you once
-                        it is ready.
-                      </div>
                     </div>
 
                     {pendingMediaKitSections.map((section) => {
@@ -1116,20 +1098,6 @@ export default function PortalShell({
                   </div>
                 )}
 
-                {platformPending && (
-                  <div className="flex flex-col gap-2.5 pt-3.5" style={{ borderTop: "1px solid var(--dtm-hairline)" }}>
-                    <div className="flex justify-between items-center gap-2.5">
-                      <div className="text-[13.5px] font-semibold text-fg-1">DTM27 platform</div>
-                      <Chip color="var(--fg-5)" bg="var(--dtm-surface-2)">
-                        Live 5 Apr 2027
-                      </Chip>
-                    </div>
-                    <div className="text-[12.5px] text-fg-4 leading-[1.55]">
-                      You will receive an invitation by email. Completing your profile is what drives
-                      your 1:1 matches.
-                    </div>
-                  </div>
-                )}
                   </Card>
                 )}
 
