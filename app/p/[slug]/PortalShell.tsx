@@ -292,7 +292,11 @@ export default function PortalShell({
               <div className="flex flex-col gap-0.5">
                 <div className="text-[12.5px] font-medium text-fg-2">{salesLead.name}</div>
                 <div className="text-[11px] text-fg-4">Partnership</div>
-                <a href={`mailto:${salesLead.email}`} className="font-mono text-[10.5px] break-all">
+                <a
+                  href={`mailto:${salesLead.email}`}
+                  title={salesLead.email}
+                  className="block truncate font-mono text-[10px]"
+                >
                   {salesLead.email}
                 </a>
               </div>
@@ -312,7 +316,11 @@ export default function PortalShell({
                 </div>
                 {c.role && <div className="text-[11px] text-fg-4">{c.role}</div>}
                 {c.email && (
-                  <a href={`mailto:${c.email}`} className="font-mono text-[10.5px] break-all">
+                  <a
+                    href={`mailto:${c.email}`}
+                    title={c.email}
+                    className="block truncate font-mono text-[10px]"
+                  >
                     {c.email}
                   </a>
                 )}
