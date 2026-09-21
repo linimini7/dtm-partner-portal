@@ -4,10 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import {
+  updateMediaKitCopy,
+  updateMediaKitImage,
   upsertExhibitorGuidelinesUrl,
   upsertFloorPlanUrl,
   upsertHotelBookingUrl,
   upsertPlatformUrl,
+  type MediaKitEvent,
 } from "@/lib/portal-content";
 import { addDtmContact, deleteDtmContact, updateDtmContact } from "@/lib/dtm-contacts";
 import type { EventName } from "@/lib/types";
@@ -84,5 +87,29 @@ export async function updateDtmContactAction(id: number, formData: FormData) {
 export async function deleteDtmContactAction(id: number) {
   await requireStaffEmail();
   await deleteDtmContact(id);
+  revalidatePath("/", "layout");
+}
+
+/**
+ * The default media kit (image + copy) shown to a partner who hasn't
+ * uploaded their own for this event yet — see
+ * lib/portal-content.ts's getEffectiveMediaKit. A partner's own upload on
+ * their /admin page always takes precedence over this once they have one.
+ */
+export async function updateGlobalMediaKit(event: MediaKitEvent, formData: FormData) {
+  const email = await requireStaffEmail();
+
+  const copy = String(formData.get("copy") ?? "").trim() || null;
+  await updateMediaKitCopy("global", event, copy, email);
+
+  const removeImage = formData.get("removeImage") === "on";
+  const file = formData.get("image") as File | null;
+  if (removeImage) {
+    await updateMediaKitImage("global", event, null, email);
+  } else if (file && file.size > 0) {
+    const bytes = Buffer.from(await file.arrayBuffer());
+    await updateMediaKitImage("global", event, { bytes, mimeType: file.type || "image/png" }, email);
+  }
+
   revalidatePath("/", "layout");
 }

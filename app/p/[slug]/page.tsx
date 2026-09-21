@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getPortalBySlug, getStaffDirectory } from "@/lib/data";
-import { getEffectivePortalContent, getMediaKit } from "@/lib/portal-content";
+import { getEffectiveMediaKit, getEffectivePortalContent } from "@/lib/portal-content";
 import { getBrandAssets, getEmailDerivedContact, getSecondPartnerContact } from "@/lib/brand-assets";
 import { listDtmContacts } from "@/lib/dtm-contacts";
 import { getCheckedObligationIds, getObligationLinks, getObligationNominees, isNomineeObligation, type Nominee } from "@/lib/obligation-checks";
@@ -55,7 +55,7 @@ export default async function PortalPage({
     hasWebsiteUrl: Boolean(brandAssets.websiteUrl),
     hasDescription: Boolean(brandAssets.description),
   });
-  const mediaKit = await getMediaKit(slug);
+  const mediaKit = await getEffectiveMediaKit(slug);
   // Prefer a staff-confirmed Attio "poc" over whatever email-ingestion
   // picked up on its own — same precedence admin/page.tsx uses. Phone has no
   // Attio equivalent, so it's always sourced from portal_content regardless

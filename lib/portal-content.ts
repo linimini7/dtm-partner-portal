@@ -1,5 +1,5 @@
 import { getPool } from "@/lib/db";
-import { type EventMediaKit, type MediaKitEvent } from "@/lib/media-kit";
+import { MEDIA_KIT_EVENTS, type EventMediaKit, type MediaKitEvent } from "@/lib/media-kit";
 import type { EventName } from "@/lib/types";
 
 // Re-exported so existing server-only importers (route handler, admin pages)
@@ -185,6 +185,25 @@ export async function getMediaKit(slug: string): Promise<Record<MediaKitEvent, E
       copy: row?.media_kit_copy_sparta27 ?? null,
     },
   };
+}
+
+/**
+ * What a partner actually sees for their media kit: their own upload for an
+ * event if they have one, otherwise the global default set on Global portal
+ * settings (see upsertGlobal media kit actions) — same override-falls-back-
+ * to-default shape as getEffectivePortalContent. Falls back per event as a
+ * whole record (image+copy together), not mixing a partner's own image with
+ * the global copy or vice versa, so a partner never sees an accidental
+ * mismatched pairing.
+ */
+export async function getEffectiveMediaKit(slug: string): Promise<Record<MediaKitEvent, EventMediaKit>> {
+  const [own, global] = await Promise.all([getMediaKit(slug), getMediaKit("global")]);
+  const effective = {} as Record<MediaKitEvent, EventMediaKit>;
+  for (const event of MEDIA_KIT_EVENTS) {
+    const ownKit = own[event];
+    effective[event] = ownKit.hasImage || ownKit.copy ? ownKit : global[event];
+  }
+  return effective;
 }
 
 /** The raw image bytes for one partner's media kit for one event, for the /api/media-kit/[slug]/[event] route. */

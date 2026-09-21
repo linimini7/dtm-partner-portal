@@ -11,7 +11,11 @@ export async function GET(
     return NextResponse.json({ error: "Unknown event" }, { status: 404 });
   }
 
-  const image = await getMediaKitImage(slug, event);
+  // Fall back to the global default media kit image when this partner
+  // hasn't uploaded their own — matches lib/portal-content.ts's
+  // getEffectiveMediaKit, which decides whether a partner's page even
+  // links here in the first place.
+  const image = (await getMediaKitImage(slug, event)) ?? (slug !== "global" ? await getMediaKitImage("global", event) : null);
   if (!image) {
     return NextResponse.json({ error: "No image uploaded" }, { status: 404 });
   }
