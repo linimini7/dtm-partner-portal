@@ -135,6 +135,31 @@ function AutoCheckRow({ checked, label }: { checked: boolean; label: string }) {
   );
 }
 
+/**
+ * Deadline shown top-right on every Action Items card — a real Notion-sourced
+ * date where one exists (o.deadlineDate, set by buildPortalView), else
+ * "ASAP" for the two obligations with no fixed calendar date in the Notion
+ * template (Guardians is explicitly "rolling" there; "Publicly announce the
+ * partnership" has no Key Dates row at all — same treatment rather than
+ * inventing a date for either).
+ */
+function DeadlineBadge({ o }: { o: PortalView["partnerObligations"][number] }) {
+  if (!o.deadlineDate && o.id !== "guardians" && o.id !== "announce") return null;
+  return (
+    <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+      <div
+        className="font-mono text-[11.5px] font-semibold uppercase tracking-[0.04em]"
+        style={{ color: "var(--warn)" }}
+      >
+        {o.deadlineDate ? formatDate(o.deadlineDate) : "ASAP"}
+      </div>
+      {o.deadlineDate && o.deadlineDaysAway !== null && (
+        <div className="text-[10.5px] text-fg-5">in {o.deadlineDaysAway} days</div>
+      )}
+    </div>
+  );
+}
+
 export default function PortalShell({
   view,
   salesLead,
@@ -1076,7 +1101,10 @@ export default function PortalShell({
                   const allDone = hasLogo && hasWebsite && hasDescription;
                   return (
                     <Card key={o.id}>
-                      <div className="text-[14px] font-medium text-fg-1">{o.title}</div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="text-[14px] font-medium text-fg-1">{o.title}</div>
+                        <DeadlineBadge o={o} />
+                      </div>
                       <div className="text-[12.5px] text-fg-4 leading-[1.5]">{o.note}</div>
                       <div className="mt-2 flex flex-col gap-2">
                         <AutoCheckRow checked={hasLogo} label="Your logo" />
@@ -1123,7 +1151,10 @@ export default function PortalShell({
                         style={{ accentColor: "var(--accent)" }}
                       />
                       <div className="w-full">
-                        <div className="text-[14px] font-medium text-fg-1">{o.title}</div>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="text-[14px] font-medium text-fg-1">{o.title}</div>
+                          <DeadlineBadge o={o} />
+                        </div>
                         <div className="text-[12.5px] text-fg-4 leading-[1.5]">{o.note}</div>
                         {pending && <div className="mt-1 text-[11px] text-fg-5">Saving…</div>}
                         <div className="mt-1.5 text-[11px] text-fg-5 leading-[1.4]">
