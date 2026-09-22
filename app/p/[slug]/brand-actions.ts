@@ -12,7 +12,12 @@ import {
   upsertPartnerContact,
   upsertSecondPartnerContact,
 } from "@/lib/brand-assets";
-import { setObligationChecked, setObligationLinks, setObligationNominees } from "@/lib/obligation-checks";
+import {
+  setObligationChecked,
+  setObligationLinks,
+  setObligationNominees,
+  setObligationTopic,
+} from "@/lib/obligation-checks";
 import type { Nominee } from "@/lib/obligation-shared";
 import { extractImagesFromZip } from "@/lib/zip-images";
 import { logActivity } from "@/lib/activity-log";
@@ -205,6 +210,20 @@ export async function saveObligationNominees(
       ? `Saved ${cleaned.length} nominee${cleaned.length === 1 ? "" : "s"} for "${title}"`
       : `Cleared nominees for "${title}"`,
   );
+  revalidatePath(`/p/${slug}`);
+}
+
+/**
+ * The working title a partner submits for a speaking slot or co-curated
+ * session — title comes from the client for the same reason as
+ * saveObligationNominees: these obligation IDs are generated dynamically
+ * per partner (lib/portal-view.ts), not in a static lookup.
+ */
+export async function saveObligationTopic(slug: string, obligationId: string, title: string, topic: string) {
+  const updatedBy = await requireWriteAccess(slug);
+  const cleaned = topic.trim();
+  await setObligationTopic(slug, obligationId, cleaned || null, updatedBy);
+  await logActivity(slug, updatedBy, cleaned ? `Set topic for "${title}": ${cleaned}` : `Cleared topic for "${title}"`);
   revalidatePath(`/p/${slug}`);
 }
 

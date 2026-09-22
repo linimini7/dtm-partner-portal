@@ -127,6 +127,19 @@ const NAMED_ATTENDEE_PROGRAMMES: { id: string; match: RegExp; label: string }[] 
 ];
 
 /**
+ * A "Content / Speaking Slot" or "Co-Curated Content Session" deliverable
+ * needs the partner to actually name who's presenting and what it's about —
+ * two separate asks (a "nominate" obligation and a "topic" obligation
+ * below), matched per deliverable (rather than just checking .some(), like
+ * NAMED_ATTENDEE_PROGRAMMES does) since a dual-event partner can hold one
+ * of each per event and each needs its own pair of obligations.
+ */
+const CONTENT_SLOT_TYPES: { idPrefix: string; match: RegExp; label: string }[] = [
+  { idPrefix: "speaking", match: /speaking\s*slot/i, label: "speaking slot" },
+  { idPrefix: "cocurated", match: /co-?curated/i, label: "co-curated session" },
+];
+
+/**
  * What a partner owes DTM under contract Section 5 — logo/guidelines and
  * announcing the partnership always apply; Guardians and named-attendee
  * programme seats only apply when the partner actually bought them.
@@ -147,7 +160,7 @@ export function derivePartnerObligations(scopedEvents: EventName[], deliverables
     {
       id: "announce",
       title: "Publicly announce the partnership",
-      note: "A social media post or newsletter mention — whenever you're ready.",
+      note: "A social media post or newsletter mention — once you've received your Media Kit under Tickets & assets.",
       deadlineDate: null,
       deadlineHard: false,
       deadlineDaysAway: null,
@@ -169,6 +182,29 @@ export function derivePartnerObligations(scopedEvents: EventName[], deliverables
         id: programme.id,
         title: `Nominate your attendee(s) for ${programme.label}`,
         note: "Let us know who's coming so we can confirm their seat.",
+        deadlineDate: null,
+        deadlineHard: false,
+        deadlineDaysAway: null,
+      });
+    }
+  }
+  for (const slotType of CONTENT_SLOT_TYPES) {
+    for (const d of deliverables) {
+      if (!slotType.match.test(d.name)) continue;
+      const eventLabel = d.events.map((e) => (e === "SPARTA 2027" ? "SPARTA27" : e)).join(" & ") || undefined;
+      const suffix = eventLabel ? ` (${eventLabel})` : "";
+      partnerObligations.push({
+        id: `${slotType.idPrefix}-nominate-${d.id}`,
+        title: `Nominate who's presenting your ${slotType.label}${suffix}`,
+        note: "Full name, position, and email address — the DTM content team will follow up directly.",
+        deadlineDate: null,
+        deadlineHard: false,
+        deadlineDaysAway: null,
+      });
+      partnerObligations.push({
+        id: `${slotType.idPrefix}-topic-${d.id}`,
+        title: `Submit a topic for your ${slotType.label}${suffix}`,
+        note: "A working title is enough for now — content details get aligned with the DTM team closer to the date.",
         deadlineDate: null,
         deadlineHard: false,
         deadlineDaysAway: null,
@@ -487,6 +523,13 @@ export function buildPortalView(
   function deadlineForObligation(obligationId: string): (typeof applicableDeadlines)[number] | undefined {
     if (obligationId === "logo") return brandAssetsDeadlineEntry;
     if (obligationId === "announce" || obligationId === "guardians") return undefined;
+    // Speaking slots and co-curated sessions both ride on the template's own
+    // "speaker details" cutoff — the closest real signal for "who's
+    // presenting and what it's about" (there's no separate co-curated-
+    // session deadline in the Notion template, so it borrows the same one).
+    if (obligationId.startsWith("speaking-") || obligationId.startsWith("cocurated-")) {
+      return applicableDeadlines.find((d) => /speaker details/i.test(d.what));
+    }
     // Named-attendee programme seats (LP-GP Marketplace, CXO/CVC Summit,
     // Investor Dinner) — the template's own "who's attending" cutoff is the
     // closest real signal for "tell us who's coming".

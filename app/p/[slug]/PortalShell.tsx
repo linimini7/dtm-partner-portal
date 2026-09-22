@@ -12,10 +12,11 @@ import { formatDate } from "@/lib/format-date";
 import BrandAssetsCard from "./BrandAssetsCard";
 import ObligationLinksEditor from "./ObligationLinksEditor";
 import NomineeEditor from "./NomineeEditor";
+import TopicEditor from "./TopicEditor";
 import PartnerContactsCard from "./PartnerContactsCard";
 import MoatIntroForm from "./MoatIntroForm";
 import { toggleObligationChecked } from "./brand-actions";
-import { isNomineeObligation, type Nominee } from "@/lib/obligation-shared";
+import { isNomineeObligation, isTopicObligation, type Nominee } from "@/lib/obligation-shared";
 
 function Card({
   children,
@@ -146,6 +147,7 @@ export default function PortalShell({
   checkedObligationIds,
   announceLinks,
   nomineesByObligation,
+  topicsByObligation,
   ticketCodes,
   dtmContacts,
   slug,
@@ -166,6 +168,8 @@ export default function PortalShell({
   announceLinks: string[];
   /** Named attendees per "nominate someone" obligation (guardians, programme seats, investor dinner) — see NomineeEditor. */
   nomineesByObligation: Record<string, Nominee[]>;
+  /** Working title submitted per speaking-slot/co-curated-session "topic" obligation — see TopicEditor. */
+  topicsByObligation: Record<string, string | null>;
   /** Redemption code per ticket deliverable id, set by staff on /admin — see lib/ticket-codes.ts. */
   ticketCodes: Record<string, string>;
   /** DTM-side people shown to every partner (name/role/email/phone, plus an optional status like "On maternal leave") — staff-managed on Global portal settings, see lib/dtm-contacts.ts. */
@@ -1283,6 +1287,14 @@ export default function PortalShell({
                         obligationId={o.id}
                         title={o.title}
                         initialNominees={nomineesByObligation[o.id] ?? []}
+                      />
+                    )}
+                    {isTopicObligation(o.id) && (
+                      <TopicEditor
+                        slug={slug}
+                        obligationId={o.id}
+                        title={o.title}
+                        initialTopic={topicsByObligation[o.id] ?? ""}
                       />
                     )}
                   </Card>

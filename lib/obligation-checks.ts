@@ -1,7 +1,7 @@
 import { getPool } from "@/lib/db";
-import { isNomineeObligation, type Nominee } from "@/lib/obligation-shared";
+import { isNomineeObligation, isTopicObligation, type Nominee } from "@/lib/obligation-shared";
 
-export { isNomineeObligation };
+export { isNomineeObligation, isTopicObligation };
 export type { Nominee };
 
 /**
@@ -111,4 +111,35 @@ export async function setObligationNominees(
       [scope, obligationId, nominee.fullName, nominee.position || null, nominee.email || null, updatedBy],
     );
   }
+}
+
+/**
+ * A single free-text value for a "submit your topic" obligation (a
+ * speaking slot or co-curated session's working title) — unlike nominees,
+ * there's only ever one topic per obligation, so this is a plain upsert
+ * rather than a delete-and-reinsert list.
+ */
+export async function getObligationTopic(scope: string, obligationId: string): Promise<string | null> {
+  const { rows } = await getPool().query<{ topic: string | null }>(
+    "SELECT topic FROM portal_obligation_topics WHERE scope = $1 AND obligation_id = $2",
+    [scope, obligationId],
+  );
+  return rows[0]?.topic ?? null;
+}
+
+export async function setObligationTopic(
+  scope: string,
+  obligationId: string,
+  topic: string | null,
+  updatedBy: string,
+): Promise<void> {
+  await getPool().query(
+    `INSERT INTO portal_obligation_topics (scope, obligation_id, topic, updated_at, updated_by)
+     VALUES ($1, $2, $3, now(), $4)
+     ON CONFLICT (scope, obligation_id) DO UPDATE SET
+       topic = EXCLUDED.topic,
+       updated_at = now(),
+       updated_by = EXCLUDED.updated_by`,
+    [scope, obligationId, topic, updatedBy],
+  );
 }

@@ -5,7 +5,15 @@ import { getPortalBySlug, getStaffDirectory } from "@/lib/data";
 import { getEffectiveMediaKit, getEffectivePortalContent } from "@/lib/portal-content";
 import { getBrandAssets, getEmailDerivedContact, getSecondPartnerContact } from "@/lib/brand-assets";
 import { listDtmContacts } from "@/lib/dtm-contacts";
-import { getCheckedObligationIds, getObligationLinks, getObligationNominees, isNomineeObligation, type Nominee } from "@/lib/obligation-checks";
+import {
+  getCheckedObligationIds,
+  getObligationLinks,
+  getObligationNominees,
+  getObligationTopic,
+  isNomineeObligation,
+  isTopicObligation,
+  type Nominee,
+} from "@/lib/obligation-checks";
 import { getTicketCodes } from "@/lib/ticket-codes";
 import { verifyPortalCode } from "@/lib/portal-code";
 import { buildPortalView } from "@/lib/portal-view";
@@ -70,6 +78,10 @@ export default async function PortalPage({
       nomineeObligationIds.map(async (id) => [id, await getObligationNominees(slug, id)] as const),
     ),
   );
+  const topicObligationIds = view.partnerObligations.map((o) => o.id).filter(isTopicObligation);
+  const topicsByObligation: Record<string, string | null> = Object.fromEntries(
+    await Promise.all(topicObligationIds.map(async (id) => [id, await getObligationTopic(slug, id)] as const)),
+  );
   const ticketCodes = await getTicketCodes(slug);
 
   return (
@@ -85,6 +97,7 @@ export default async function PortalPage({
       checkedObligationIds={checkedObligationIds}
       announceLinks={announceLinks}
       nomineesByObligation={nomineesByObligation}
+      topicsByObligation={topicsByObligation}
       ticketCodes={ticketCodes}
       dtmContacts={dtmContacts}
       slug={slug}
