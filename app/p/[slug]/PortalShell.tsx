@@ -384,9 +384,17 @@ export default function PortalShell({
   // No hardcoded max-width here (unlike the pre-existing standalone
   // rendering below) — a single-event partner's combined two-column layout
   // sizes this off its own grid column instead, per the conversation this
-  // was fixed in ("make it relative, don't fix it").
-  const experienceCardsNode = view.hasGuardian ? (
-    <div className="flex flex-col gap-[18px]">
+  // was fixed in ("make it relative, don't fix it"). `sideBySide` puts the
+  // Guardian and Meet cards next to each other instead of stacked — used
+  // only for a dual-event partner's full-width section below, where there's
+  // room for two columns; the single-event grid column call site stays
+  // stacked since its column is too narrow for two cards side by side.
+  function renderExperienceCards(sideBySide: boolean) {
+    return view.hasGuardian ? (
+    <div
+      className={sideBySide ? "grid gap-[18px] items-start" : "flex flex-col gap-[18px]"}
+      style={sideBySide ? { gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))" } : undefined}
+    >
       <Card
         style={{
           border: "1px solid rgb(79 169 122 / 28%)",
@@ -530,7 +538,8 @@ export default function PortalShell({
         Until then, reply to your point of contact.
       </div>
     </Card>
-  );
+    );
+  }
 
   return (
     <div
@@ -783,7 +792,7 @@ export default function PortalShell({
                 </div>
                 <div className="flex flex-col gap-[18px] min-w-0">
                   <div className="text-[17px] font-semibold text-fg-1">{experienceHeading}</div>
-                  {experienceCardsNode}
+                  {renderExperienceCards(false)}
                 </div>
               </div>
             ) : (
@@ -803,7 +812,11 @@ export default function PortalShell({
                 <div className="border-t border-dtm-hairline" />
                 <div className="flex flex-col gap-[18px]">
                   <div className="text-[17px] font-semibold text-fg-1">{experienceHeading}</div>
-                  {view.hasGuardian ? experienceCardsNode : <div className="max-w-[520px]">{experienceCardsNode}</div>}
+                  {view.hasGuardian ? (
+                    renderExperienceCards(view.eventSections.length > 1)
+                  ) : (
+                    <div className="max-w-[520px]">{renderExperienceCards(false)}</div>
+                  )}
                 </div>
               </>
             )}
