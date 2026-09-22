@@ -39,14 +39,9 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
           ← All portals
         </Link>
         <h1 className="mt-2 text-2xl text-fg-1">{portal.companyName} — admin</h1>
-        <div className="flex gap-4">
-          <Link href={`/p/${slug}`} className="text-sm">
-            View the partner-facing portal ↗
-          </Link>
-          <Link href={`/p/${slug}/admin/deliverables`} className="text-sm">
-            DTM deliverable tracker (internal) →
-          </Link>
-        </div>
+        <Link href={`/p/${slug}`} className="text-sm">
+          View the partner-facing portal ↗
+        </Link>
       </div>
 
       <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6">

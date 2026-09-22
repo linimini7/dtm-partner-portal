@@ -82,12 +82,9 @@ export interface KeyDateRow {
 /**
  * What the PARTNER owes DTM (every real contract's "Partner Deliverables"
  * section — logo & guidelines, announce the partnership, nominate
- * Guardians), as opposed to what DTM owes the partner (see
- * lib/dtm-deliverables.ts — DTM-internal, staff-only, never routed through
- * this file; see the warning above). Not modeled in Attio (confirmed
- * decision) — these three items repeat near-identically across every
- * contract read so far, so deriving them is a reasonable default, not an
- * invention.
+ * Guardians). Not modeled in Attio (confirmed decision) — these three
+ * items repeat near-identically across every contract read so far, so
+ * deriving them is a reasonable default, not an invention.
  */
 export interface PartnerObligation {
   id: string;

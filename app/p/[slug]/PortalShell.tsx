@@ -546,20 +546,6 @@ export default function PortalShell({
               <span>{item.label}</span>
             </button>
           ))}
-
-          {isStaff && (
-            <>
-              <div className="my-2 border-t border-dtm-hairline" />
-              <Link
-                href={`/p/${slug}/admin/deliverables`}
-                className="flex items-center gap-3 w-full text-left text-[13.5px] font-medium px-2.5 py-2 border-0 rounded-[8px]"
-                style={{ color: "var(--fg-4)" }}
-              >
-                <span className="font-mono text-[10px] opacity-50 w-4">••</span>
-                <span>DTM Deliverables</span>
-              </Link>
-            </>
-          )}
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
