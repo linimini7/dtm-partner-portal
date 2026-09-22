@@ -28,16 +28,18 @@ export interface ScheduledDeadline {
   events: EventName[];
   /**
    * Marks a deadline that has a real, per-partner completion signal
-   * elsewhere in the app — currently only "brandAssets" (logo/website
-   * URL/description, tracked in lib/brand-assets.ts). When set,
-   * lib/portal-view.ts's "What we need from you" summary narrows this
-   * item's wording to only what's still missing, or drops it entirely once
-   * everything's in, instead of showing it purely by date like every other
-   * entry here (which have no such signal to check). Set on one entry per
-   * event (the DTM27 and SPARTA27 graphic submission deadlines below) —
-   * lib/portal-view.ts picks the earlier one for a partner scoped to both.
+   * elsewhere in the app. "brandAssets" (logo/website URL/description,
+   * tracked in lib/brand-assets.ts) narrows or drops the "What we need from
+   * you" summary's wording once everything's in, instead of showing it
+   * purely by date like every other entry here. "mediaKit" is the reverse
+   * direction — DTM owes the partner this one, not the other way round —
+   * and is used only to show an expected-by date on the "Coming your way"
+   * media kit card (lib/portal-view.ts's EventOverviewSection.mediaKitDeadline)
+   * until the real kit is uploaded. Set on one entry per event — the DTM27
+   * and SPARTA27 graphic submission deadlines below share "brandAssets";
+   * the two media kit entries below share "mediaKit".
    */
-  trackedBy?: "brandAssets";
+  trackedBy?: "brandAssets" | "mediaKit";
 }
 
 export const SCHEDULED_DEADLINES: ScheduledDeadline[] = [
@@ -48,6 +50,18 @@ export const SCHEDULED_DEADLINES: ScheduledDeadline[] = [
     appliesTo: "everyone",
     hard: false,
     events: ["DTM27"],
+  },
+  {
+    // No date exists in the Notion template for this one (it's DTM's own
+    // deliverable, not a partner "key date") — team-set target, about a
+    // week after the logo/description deadline above so the kit can use
+    // real partner branding instead of a placeholder.
+    date: "2027-02-01",
+    what: "You'll receive your media kit — a LinkedIn-ready image, ready-to-post copy and your logo lockup with DTM",
+    appliesTo: "everyone",
+    hard: false,
+    events: ["DTM27"],
+    trackedBy: "mediaKit",
   },
   {
     date: "2027-02-22",
@@ -152,6 +166,17 @@ export const SCHEDULED_DEADLINES: ScheduledDeadline[] = [
     appliesTo: "speaking",
     hard: true,
     events: ["SPARTA 2027"],
+  },
+  {
+    // Same reasoning as the DTM27 media kit entry above — no Notion
+    // template date, team-set target. Earlier than DTM27's since SPARTA's
+    // whole runway is shorter and the agenda already goes live 02.11.2026.
+    date: "2026-11-15",
+    what: "You'll receive your media kit — a LinkedIn-ready image, ready-to-post copy and your logo lockup with DTM",
+    appliesTo: "everyone",
+    hard: false,
+    events: ["SPARTA 2027"],
+    trackedBy: "mediaKit",
   },
   {
     // Same "Graphic submission deadline" logic as the DTM27 entry above —

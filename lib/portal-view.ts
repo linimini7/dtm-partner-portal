@@ -70,6 +70,8 @@ export interface EventOverviewSection {
   /** Website / Floor plan / Hotel booking — practical links only; dates/location/context are their own fields above instead of being mixed into this list. */
   practicalLinks: PackageRow[];
   glanceRows: PackageRow[];
+  /** When this event's media kit is expected, if it hasn't been uploaded yet — the one ScheduledDeadline tagged `trackedBy: "mediaKit"` for this event. Null once no such deadline applies (shouldn't happen for a current-cycle event, but mirrors brandAssetsDeadline's shape). */
+  mediaKitDeadline: string | null;
 }
 
 export interface KeyDateRow {
@@ -512,6 +514,8 @@ export function buildPortalView(
         context: info.context,
         practicalLinks,
         glanceRows: packageRowsFor(deliverables.filter((d) => d.events.includes(event))),
+        mediaKitDeadline:
+          applicableDeadlines.find((d) => d.trackedBy === "mediaKit" && d.events.includes(event))?.date ?? null,
       };
     })
     .filter((s): s is EventOverviewSection => s !== null);
