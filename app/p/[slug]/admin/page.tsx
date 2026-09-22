@@ -49,7 +49,7 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
         <p className="mb-2 font-mono text-2xl" style={{ color: "var(--accent)" }}>
           {code}
         </p>
-        <p className="text-sm text-fg-4">
+        <p className="text-[15px] text-fg-3">
           Send this to the partner&apos;s point of contact — entering it at{" "}
           <code>/p/{slug}</code> unlocks their portal with no account needed. It never expires
           or rotates unless <code>PORTAL_CODE_SECRET</code> changes.
@@ -59,12 +59,12 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
       <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6">
         <p className="eyebrow mb-2">Ticket redemption codes</p>
         {view.ticketItems.length === 0 ? (
-          <p className="text-sm text-fg-4">No ticket deliverables recorded for this partner yet.</p>
+          <p className="text-[15px] text-fg-3">No ticket deliverables recorded for this partner yet.</p>
         ) : (
           <form action={updateTicketCodesAction} className="flex flex-col gap-4">
             {view.ticketItems.map((d) => (
-              <label key={d.id} className="block text-sm">
-                <span className="mb-1 block text-fg-3">
+              <label key={d.id} className="block text-[15px]">
+                <span className="mb-1 block text-fg-2">
                   {d.name}
                   {d.quantity && d.quantity > 1 ? ` (× ${d.quantity})` : ""}
                 </span>
@@ -79,14 +79,14 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
             ))}
             <button
               type="submit"
-              className="self-start rounded-[8px] px-4 py-2 text-sm font-medium"
+              className="self-start rounded-[8px] px-4 py-2 text-[15px] font-medium"
               style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
             >
               Save redemption codes
             </button>
           </form>
         )}
-        <p className="mt-3 text-xs text-fg-5">
+        <p className="mt-3 text-[13px] text-fg-4">
           Each ticket type gets its own code — the partner sees it under &quot;Redeem your
           included tickets.&quot;
         </p>
@@ -96,42 +96,42 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
         <p className="eyebrow mb-2">Partner&apos;s point of contact</p>
         {portal.poc ? (
           <div className="flex flex-col gap-0.5">
-            <p className="text-[15px] text-fg-1">{portal.poc.name}</p>
-            {portal.poc.jobTitle && <p className="text-sm text-fg-4">{portal.poc.jobTitle}</p>}
+            <p className="text-[16px] text-fg-1">{portal.poc.name}</p>
+            {portal.poc.jobTitle && <p className="text-[15px] text-fg-3">{portal.poc.jobTitle}</p>}
             {portal.poc.email && (
-              <a href={`mailto:${portal.poc.email}`} className="text-sm">
+              <a href={`mailto:${portal.poc.email}`} className="text-[15px]">
                 {portal.poc.email}
               </a>
             )}
             {contactPhone && (
-              <a href={`tel:${contactPhone}`} className="text-sm">
+              <a href={`tel:${contactPhone}`} className="text-[15px]">
                 {contactPhone}
               </a>
             )}
           </div>
         ) : emailContact ? (
           <div className="flex flex-col gap-0.5">
-            <p className="text-[15px] text-fg-1">{emailContact.name ?? emailContact.email}</p>
-            <a href={`mailto:${emailContact.email}`} className="text-sm">
+            <p className="text-[16px] text-fg-1">{emailContact.name ?? emailContact.email}</p>
+            <a href={`mailto:${emailContact.email}`} className="text-[15px]">
               {emailContact.email}
             </a>
             {contactPhone && (
-              <a href={`tel:${contactPhone}`} className="text-sm">
+              <a href={`tel:${contactPhone}`} className="text-[15px]">
                 {contactPhone}
               </a>
             )}
-            <p className="mt-1 text-xs text-fg-5">
+            <p className="mt-1 text-[13px] text-fg-4">
               Picked up automatically from an email — not set on Attio&apos;s CS Tracker entry.
             </p>
           </div>
         ) : (
-          <p className="text-sm text-fg-4">
+          <p className="text-[15px] text-fg-3">
             No PoC set on the CS Tracker entry yet — set the &quot;PoC&quot; field on this
             company&apos;s CS Tracker entry in Attio.
           </p>
         )}
         {!contactPhone && (portal.poc || emailContact) && (
-          <p className="mt-2 text-xs text-fg-5">
+          <p className="mt-2 text-[13px] text-fg-4">
             No phone on file — the partner (or you, on their portal) can add one under
             &quot;Point of contact.&quot;
           </p>
@@ -180,14 +180,6 @@ export default async function PortalAdminPage({ params }: PageProps<"/p/[slug]/a
         );
       })}
 
-      {portal.internalNotes && (
-        <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-6">
-          <p className="eyebrow mb-2">Internal notes (staff only)</p>
-          <p className="whitespace-pre-wrap text-sm text-fg-3 leading-[1.55]">
-            {portal.internalNotes}
-          </p>
-        </div>
-      )}
     </main>
   );
 }
