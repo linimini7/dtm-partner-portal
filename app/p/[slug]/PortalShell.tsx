@@ -128,9 +128,25 @@ function AutoCheckRow({ checked, label }: { checked: boolean; label: string }) {
         checked={checked}
         disabled
         className="h-4 w-4 shrink-0"
-        style={{ accentColor: "var(--accent)" }}
+        style={{ accentColor: checked ? "var(--ok)" : "var(--dtm-hairline-2)" }}
       />
-      <span className="text-[13px] text-fg-2">{label}</span>
+      <span
+        className="text-[13px]"
+        style={{
+          color: checked ? "var(--fg-5)" : "var(--fg-2)",
+          textDecoration: checked ? "line-through" : "none",
+        }}
+      >
+        {label}
+      </span>
+      {!checked && (
+        <span
+          className="ml-auto shrink-0 font-mono text-[10.5px] uppercase tracking-[0.08em]"
+          style={{ color: "var(--warn)" }}
+        >
+          Still needed
+        </span>
+      )}
     </label>
   );
 }
@@ -1161,11 +1177,29 @@ export default function PortalShell({
                         disabled={pending}
                         onChange={(e) => handleObligationToggle(o.id, o.title, e.target.checked)}
                         className="mt-0.5 h-4 w-4 shrink-0"
-                        style={{ accentColor: "var(--accent)" }}
+                        style={{ accentColor: checked ? "var(--ok)" : "var(--accent)" }}
                       />
                       <div className="w-full">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="text-[14px] font-medium text-fg-1">{o.title}</div>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="text-[14px] font-medium"
+                              style={{
+                                color: checked ? "var(--fg-5)" : "var(--fg-1)",
+                                textDecoration: checked ? "line-through" : "none",
+                              }}
+                            >
+                              {o.title}
+                            </div>
+                            {!checked && (
+                              <span
+                                className="shrink-0 whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.08em]"
+                                style={{ color: "var(--warn)" }}
+                              >
+                                Still needed
+                              </span>
+                            )}
+                          </div>
                           <DeadlineBadge o={o} />
                         </div>
                         <div className="text-[12.5px] text-fg-4 leading-[1.5]">{o.note}</div>
