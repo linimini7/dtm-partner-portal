@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PortalSummary } from "@/lib/types";
 
 interface Row extends PortalSummary {
@@ -88,6 +88,54 @@ function sortRows(rows: Row[], sortKeys: SortKey[]): Row[] {
   });
 }
 
+/** Every filterable field, Attio-style — pick a field, pick a value, add as many rules as you want, all AND'd together. Free-text company search stays a separate always-visible box rather than becoming a rule type, since it's the single most common action here. */
+type FilterField = "event" | "csStage" | "salesLead" | "contract" | "portalStatus";
+
+interface FilterRule {
+  field: FilterField;
+  /** Empty until a value is picked — an incomplete rule matches everything rather than hiding all rows while it's being set up. */
+  value: string;
+}
+
+const FILTER_FIELD_LABELS: Record<FilterField, string> = {
+  event: "Event",
+  csStage: "CS stage",
+  salesLead: "Sales lead",
+  contract: "Contract",
+  portalStatus: "Portal status",
+};
+
+function matchesFilterRule(row: Row, rule: FilterRule): boolean {
+  if (!rule.value) return true;
+  switch (rule.field) {
+    case "event":
+      if (rule.value === BOTH_EVENTS_FILTER) {
+        return row.events.includes("DTM27" as never) && row.events.includes("SPARTA 2027" as never);
+      }
+      return row.events.includes(rule.value as never);
+    case "csStage":
+      return row.csStage === rule.value;
+    case "salesLead":
+      return row.salesLeadName === rule.value;
+    case "contract":
+      return rule.value === "On file" ? row.hasContract : !row.hasContract;
+    case "portalStatus":
+      return rule.value === "Live" ? row.onboardingStage === "Portal live" : row.onboardingStage !== "Portal live";
+  }
+}
+
+/** Closes a popover on an outside click — plain addEventListener rather than a UI library, since nothing else in this app uses one. */
+function useOutsideClick(ref: React.RefObject<HTMLElement | null>, onOutside: () => void, active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onOutside();
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [ref, onOutside, active]);
+}
+
 function CopyCode({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -171,9 +219,6 @@ function ColumnResizeHandle({
 
 export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffEmail?: string | null }) {
   const [search, setSearch] = useState("");
-  const [event, setEvent] = useState("all");
-  const [csStage, setCsStage] = useState("all");
-  const [salesLead, setSalesLead] = useState("all");
   const [widths, setWidths] = useState<Record<ColumnKey, number>>(() =>
     Object.fromEntries(COLUMNS.map((c) => [c.key, c.width])) as Record<ColumnKey, number>,
   );
@@ -237,6 +282,69 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
     }
   }, [sortKeys, sortStorageKey, sortHydrated]);
 
+  // Same persist-after-hydrate pattern as sort above.
+  const filterStorageKey = `portals-table-filters:${staffEmail ?? "anonymous"}`;
+  const [filterRules, setFilterRules] = useState<FilterRule[]>([]);
+  const [filterHydrated, setFilterHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(filterStorageKey);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (saved) setFilterRules(JSON.parse(saved));
+    } catch {
+      // Ignore a missing/corrupt value — falls back to unfiltered.
+    }
+    setFilterHydrated(true);
+  }, [filterStorageKey]);
+
+  useEffect(() => {
+    if (!filterHydrated) return;
+    try {
+      window.localStorage.setItem(filterStorageKey, JSON.stringify(filterRules));
+    } catch {
+      // Private-browsing or storage-disabled — filtering still works, it just won't persist.
+    }
+  }, [filterRules, filterStorageKey, filterHydrated]);
+
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortPopoverRef = useRef<HTMLDivElement>(null);
+  useOutsideClick(sortPopoverRef, () => setSortOpen(false), sortOpen);
+
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterPopoverRef = useRef<HTMLDivElement>(null);
+  useOutsideClick(filterPopoverRef, () => setFilterOpen(false), filterOpen);
+
+  function addSort() {
+    setSortKeys((prev) => {
+      const used = new Set(prev.map((k) => k.column));
+      const next = COLUMNS.find((c) => !used.has(c.key));
+      return next ? [...prev, { column: next.key, direction: "asc" as const }] : prev;
+    });
+  }
+  function updateSortColumn(index: number, column: ColumnKey) {
+    setSortKeys((prev) => prev.map((k, i) => (i === index ? { ...k, column } : k)));
+  }
+  function updateSortDirection(index: number, direction: "asc" | "desc") {
+    setSortKeys((prev) => prev.map((k, i) => (i === index ? { ...k, direction } : k)));
+  }
+  function removeSortAt(index: number) {
+    setSortKeys((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function addFilter() {
+    setFilterRules((prev) => [...prev, { field: "event", value: "" }]);
+  }
+  function updateFilterField(index: number, field: FilterField) {
+    setFilterRules((prev) => prev.map((r, i) => (i === index ? { field, value: "" } : r)));
+  }
+  function updateFilterValue(index: number, value: string) {
+    setFilterRules((prev) => prev.map((r, i) => (i === index ? { ...r, value } : r)));
+  }
+  function removeFilterAt(index: number) {
+    setFilterRules((prev) => prev.filter((_, i) => i !== index));
+  }
+
   function toggleSort(column: ColumnKey, additive: boolean) {
     setSortKeys((prev) => {
       const existing = prev.find((k) => k.column === column);
@@ -275,16 +383,30 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
     [rows],
   );
 
+  function filterFieldOptions(field: FilterField): { value: string; label: string }[] {
+    switch (field) {
+      case "event":
+        return events.map((e) => ({ value: e, label: e === BOTH_EVENTS_FILTER ? "DTM27 & SPARTA27" : eventLabel(e) }));
+      case "csStage":
+        return stages.map((s) => ({ value: s, label: s }));
+      case "salesLead":
+        return salesLeads.map((s) => ({ value: s, label: s }));
+      case "contract":
+        return [
+          { value: "On file", label: "On file" },
+          { value: "Missing", label: "Missing" },
+        ];
+      case "portalStatus":
+        return [
+          { value: "Live", label: "Live" },
+          { value: "Draft", label: "Draft" },
+        ];
+    }
+  }
+
   const filtered = rows.filter((r) => {
     if (search && !r.companyName.toLowerCase().includes(search.toLowerCase())) return false;
-    if (event === BOTH_EVENTS_FILTER) {
-      if (!r.events.includes("DTM27" as never) || !r.events.includes("SPARTA 2027" as never)) return false;
-    } else if (event !== "all" && !r.events.includes(event as never)) {
-      return false;
-    }
-    if (csStage !== "all" && r.csStage !== csStage) return false;
-    if (salesLead !== "all" && r.salesLeadName !== salesLead) return false;
-    return true;
+    return filterRules.every((rule) => matchesFilterRule(r, rule));
   });
 
   const sorted = sortRows(filtered, sortKeys);
@@ -302,7 +424,7 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
         <Counter label="Deliverables overdue" value={overdueTotal} tone={overdueTotal > 0 ? "alert" : "ok"} />
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="mb-4 flex flex-wrap items-start gap-3">
         <input
           type="text"
           placeholder="Search company"
@@ -310,24 +432,165 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
           onChange={(e) => setSearch(e.target.value)}
           className="rounded-[var(--radius-panel)] border border-dtm-hairline bg-dtm-surface px-3 py-2 text-fg-1 placeholder:text-fg-4"
         />
-        <Select
-          label="Event"
-          value={event}
-          onChange={setEvent}
-          options={events}
-          formatLabel={(o) => (o === BOTH_EVENTS_FILTER ? "DTM27 & SPARTA27" : eventLabel(o))}
-        />
-        <Select label="CS stage" value={csStage} onChange={setCsStage} options={stages} />
-        <Select label="Sales lead" value={salesLead} onChange={setSalesLead} options={salesLeads} />
-        {sortKeys.length > 0 && (
+
+        <div className="relative" ref={sortPopoverRef}>
           <button
             type="button"
-            onClick={() => setSortKeys([])}
-            className="rounded-[var(--radius-panel)] border border-dtm-hairline px-3 py-2 text-sm text-fg-3"
+            onClick={() => {
+              setSortOpen((v) => !v);
+              setFilterOpen(false);
+            }}
+            className="rounded-[var(--radius-panel)] border px-3 py-2 text-sm"
+            style={{
+              borderColor: sortOpen || sortKeys.length > 0 ? "var(--fg-accent)" : "var(--dtm-hairline)",
+              color: sortKeys.length > 0 ? "var(--fg-1)" : "var(--fg-3)",
+            }}
           >
-            Clear sort
+            {sortKeys.length === 0
+              ? "Sort"
+              : `Sorted by ${COLUMNS.find((c) => c.key === sortKeys[0].column)?.label}${
+                  sortKeys.length > 1 ? ` +${sortKeys.length - 1}` : ""
+                }`}
           </button>
-        )}
+          {sortOpen && (
+            <div className="absolute z-20 mt-2 w-[380px] rounded-[var(--radius-panel)] border border-dtm-hairline-2 bg-dtm-surface p-3 shadow-lg">
+              <div className="flex flex-col gap-2">
+                {sortKeys.length === 0 && <p className="text-xs text-fg-5">No sort applied yet.</p>}
+                {sortKeys.map((key, i) => {
+                  const used = sortKeys.map((k) => k.column);
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="w-4 shrink-0 text-[10px] text-fg-5">{i + 1}</span>
+                      <select
+                        value={key.column}
+                        onChange={(e) => updateSortColumn(i, e.target.value as ColumnKey)}
+                        className="min-w-0 flex-1 rounded-[var(--radius-chip)] border border-dtm-hairline-2 bg-dtm-ink px-2 py-1.5 text-sm text-fg-1"
+                      >
+                        {COLUMNS.filter((c) => c.key === key.column || !used.includes(c.key)).map((c) => (
+                          <option key={c.key} value={c.key}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={key.direction}
+                        onChange={(e) => updateSortDirection(i, e.target.value as "asc" | "desc")}
+                        className="shrink-0 rounded-[var(--radius-chip)] border border-dtm-hairline-2 bg-dtm-ink px-2 py-1.5 text-sm text-fg-1"
+                      >
+                        <option value="asc">Ascending</option>
+                        <option value="desc">Descending</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removeSortAt(i)}
+                        aria-label="Remove sort"
+                        className="shrink-0 px-1 text-fg-5 hover:text-fg-1"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={addSort}
+                  disabled={sortKeys.length >= COLUMNS.length}
+                  className="text-sm font-medium disabled:opacity-40"
+                  style={{ color: "var(--accent)" }}
+                >
+                  + Add sort
+                </button>
+                {sortKeys.length > 0 && (
+                  <button type="button" onClick={() => setSortKeys([])} className="text-xs text-fg-5">
+                    Clear all
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="relative" ref={filterPopoverRef}>
+          <button
+            type="button"
+            onClick={() => {
+              setFilterOpen((v) => !v);
+              setSortOpen(false);
+            }}
+            className="rounded-[var(--radius-panel)] border px-3 py-2 text-sm"
+            style={{
+              borderColor: filterOpen || filterRules.length > 0 ? "var(--fg-accent)" : "var(--dtm-hairline)",
+              color: filterRules.length > 0 ? "var(--fg-1)" : "var(--fg-3)",
+            }}
+          >
+            {filterRules.length === 0
+              ? "Filter"
+              : `Filtered by ${FILTER_FIELD_LABELS[filterRules[0].field]}${
+                  filterRules.length > 1 ? ` +${filterRules.length - 1}` : ""
+                }`}
+          </button>
+          {filterOpen && (
+            <div className="absolute z-20 mt-2 w-[420px] rounded-[var(--radius-panel)] border border-dtm-hairline-2 bg-dtm-surface p-3 shadow-lg">
+              <div className="flex flex-col gap-2">
+                {filterRules.length === 0 && <p className="text-xs text-fg-5">No filters applied yet.</p>}
+                {filterRules.map((rule, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <select
+                      value={rule.field}
+                      onChange={(e) => updateFilterField(i, e.target.value as FilterField)}
+                      className="min-w-0 flex-[0_0_120px] rounded-[var(--radius-chip)] border border-dtm-hairline-2 bg-dtm-ink px-2 py-1.5 text-sm text-fg-1"
+                    >
+                      {(Object.keys(FILTER_FIELD_LABELS) as FilterField[]).map((f) => (
+                        <option key={f} value={f}>
+                          {FILTER_FIELD_LABELS[f]}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="shrink-0 text-xs text-fg-5">is</span>
+                    <select
+                      value={rule.value}
+                      onChange={(e) => updateFilterValue(i, e.target.value)}
+                      className="min-w-0 flex-1 rounded-[var(--radius-chip)] border border-dtm-hairline-2 bg-dtm-ink px-2 py-1.5 text-sm text-fg-1"
+                    >
+                      <option value="">Select…</option>
+                      {filterFieldOptions(rule.field).map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeFilterAt(i)}
+                      aria-label="Remove filter"
+                      className="shrink-0 px-1 text-fg-5 hover:text-fg-1"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={addFilter}
+                  className="text-sm font-medium"
+                  style={{ color: "var(--accent)" }}
+                >
+                  + Add filter
+                </button>
+                {filterRules.length > 0 && (
+                  <button type="button" onClick={() => setFilterRules([])} className="text-xs text-fg-5">
+                    Clear all
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={() =>
@@ -339,8 +602,9 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
         </button>
       </div>
       <div className="mb-4 -mt-2 text-xs text-fg-5">
-        Click a column to sort by it · shift-click another to add it as a tiebreaker. Drag a column&apos;s
-        right edge to resize it. Both are remembered next time you open this page.
+        Click a column to sort by it · shift-click another to add it as a tiebreaker, or use the Sort button
+        for several rules at once. Use Filter to narrow by more than one field. Drag a column&apos;s right
+        edge to resize it. All three are remembered next time you open this page.
       </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-card)] border border-dtm-hairline">
@@ -462,36 +726,6 @@ function Counter({
       </p>
       {note && <p className="mt-1 text-xs text-fg-4">{note}</p>}
     </div>
-  );
-}
-
-function Select({
-  label,
-  value,
-  onChange,
-  options,
-  formatLabel = (o) => o,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-  formatLabel?: (option: string) => string;
-}) {
-  return (
-    <select
-      aria-label={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="rounded-[var(--radius-panel)] border border-dtm-hairline bg-dtm-surface px-3 py-2 text-fg-1"
-    >
-      <option value="all">{label}: all</option>
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {formatLabel(o)}
-        </option>
-      ))}
-    </select>
   );
 }
 
