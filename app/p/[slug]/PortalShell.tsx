@@ -1028,13 +1028,9 @@ export default function PortalShell({
                     >
                       <div className="flex justify-between items-center gap-2.5">
                         <div className="text-[13.5px] font-semibold text-fg-1">{title}</div>
-                        {section.mediaKitDeadline ? (
-                          <Chip color="var(--warn)">{formatDate(section.mediaKitDeadline)}</Chip>
-                        ) : (
-                          <Chip color="var(--fg-5)" bg="var(--dtm-surface-2)">
-                            Coming soon
-                          </Chip>
-                        )}
+                        <Chip color="var(--fg-5)" bg="var(--dtm-surface-2)">
+                          Coming soon
+                        </Chip>
                       </div>
                       <div className="text-[12.5px] text-fg-4 leading-[1.55]">
                         A LinkedIn-ready image and ready-to-post copy for your partnership

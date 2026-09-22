@@ -28,18 +28,18 @@ export interface ScheduledDeadline {
   events: EventName[];
   /**
    * Marks a deadline that has a real, per-partner completion signal
-   * elsewhere in the app. "brandAssets" (logo/website URL/description,
+   * elsewhere in the app — "brandAssets" (logo/website URL/description,
    * tracked in lib/brand-assets.ts) narrows or drops the "What we need from
    * you" summary's wording once everything's in, instead of showing it
-   * purely by date like every other entry here. "mediaKit" is the reverse
-   * direction — DTM owes the partner this one, not the other way round —
-   * and is used only to show an expected-by date on the "Coming your way"
-   * media kit card (lib/portal-view.ts's EventOverviewSection.mediaKitDeadline)
-   * until the real kit is uploaded. Set on one entry per event — the DTM27
-   * and SPARTA27 graphic submission deadlines below share "brandAssets";
-   * the two media kit entries below share "mediaKit".
+   * purely by date like every other entry here. "announce" is the real
+   * deadline for the "Publicly announce the partnership" obligation — no
+   * date exists for it in either Notion template, so lib/portal-view.ts's
+   * deadlineForObligation() falls back to these team-set targets instead of
+   * leaving it undated. Set on one entry per event — the DTM27 and SPARTA27
+   * graphic submission deadlines below share "brandAssets"; the two
+   * announce entries below share "announce".
    */
-  trackedBy?: "brandAssets" | "mediaKit";
+  trackedBy?: "brandAssets" | "announce";
 }
 
 export const SCHEDULED_DEADLINES: ScheduledDeadline[] = [
@@ -52,16 +52,14 @@ export const SCHEDULED_DEADLINES: ScheduledDeadline[] = [
     events: ["DTM27"],
   },
   {
-    // No date exists in the Notion template for this one (it's DTM's own
-    // deliverable, not a partner "key date") — team-set target, about a
-    // week after the logo/description deadline above so the kit can use
-    // real partner branding instead of a placeholder.
+    // No date exists in either Notion template for "Publicly announce the
+    // partnership" — team-set target.
     date: "2027-02-01",
-    what: "You'll receive your media kit — a LinkedIn-ready image, ready-to-post copy and your logo lockup with DTM",
+    what: "Publicly announce the partnership — once you've received your media kit",
     appliesTo: "everyone",
     hard: false,
     events: ["DTM27"],
-    trackedBy: "mediaKit",
+    trackedBy: "announce",
   },
   {
     date: "2027-02-22",
@@ -168,15 +166,15 @@ export const SCHEDULED_DEADLINES: ScheduledDeadline[] = [
     events: ["SPARTA 2027"],
   },
   {
-    // Same reasoning as the DTM27 media kit entry above — no Notion
-    // template date, team-set target. Earlier than DTM27's since SPARTA's
-    // whole runway is shorter and the agenda already goes live 02.11.2026.
+    // Same reasoning as the DTM27 announce entry above — no Notion template
+    // date, team-set target. Earlier than DTM27's since SPARTA's whole
+    // runway is shorter and the agenda already goes live 02.11.2026.
     date: "2026-11-15",
-    what: "You'll receive your media kit — a LinkedIn-ready image, ready-to-post copy and your logo lockup with DTM",
+    what: "Publicly announce the partnership — once you've received your media kit",
     appliesTo: "everyone",
     hard: false,
     events: ["SPARTA 2027"],
-    trackedBy: "mediaKit",
+    trackedBy: "announce",
   },
   {
     // Same "Graphic submission deadline" logic as the DTM27 entry above —
