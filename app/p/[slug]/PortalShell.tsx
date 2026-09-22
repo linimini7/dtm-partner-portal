@@ -120,16 +120,26 @@ function KV({
 }
 
 /** A read-only checkbox row reflecting real data (no click handler) — used for the "Submit your brand guidelines" sub-checks, which tick themselves rather than being manually toggled. */
+/** Custom-painted box instead of a native checkbox's `accent-color` — that renders inconsistently (muted, sometimes not clearly green at all) across browsers, where this always looks the same. */
+function CheckBox({ checked }: { checked: boolean }) {
+  return (
+    <div
+      className="grid h-4 w-4 shrink-0 place-items-center rounded-[4px] text-[10px] leading-none font-bold"
+      style={{
+        border: `1px solid ${checked ? "var(--ok)" : "var(--dtm-hairline-2)"}`,
+        background: checked ? "var(--ok)" : "transparent",
+        color: "var(--dtm-ink)",
+      }}
+    >
+      {checked ? "✓" : ""}
+    </div>
+  );
+}
+
 function AutoCheckRow({ checked, label }: { checked: boolean; label: string }) {
   return (
     <label className="flex items-center gap-2.5">
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled
-        className="h-4 w-4 shrink-0"
-        style={{ accentColor: checked ? "var(--ok)" : "var(--dtm-hairline-2)" }}
-      />
+      <CheckBox checked={checked} />
       <span
         className="text-[13px]"
         style={{
@@ -1176,9 +1186,11 @@ export default function PortalShell({
                         checked={checked}
                         disabled={pending}
                         onChange={(e) => handleObligationToggle(o.id, o.title, e.target.checked)}
-                        className="mt-0.5 h-4 w-4 shrink-0"
-                        style={{ accentColor: checked ? "var(--ok)" : "var(--accent)" }}
+                        className="sr-only"
                       />
+                      <div className="mt-0.5">
+                        <CheckBox checked={checked} />
+                      </div>
                       <div className="w-full">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-2">
