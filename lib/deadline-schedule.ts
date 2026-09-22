@@ -33,7 +33,9 @@ export interface ScheduledDeadline {
    * lib/portal-view.ts's "What we need from you" summary narrows this
    * item's wording to only what's still missing, or drops it entirely once
    * everything's in, instead of showing it purely by date like every other
-   * entry here (which have no such signal to check).
+   * entry here (which have no such signal to check). Set on one entry per
+   * event (the DTM27 and SPARTA27 graphic submission deadlines below) —
+   * lib/portal-view.ts picks the earlier one for a partner scoped to both.
    */
   trackedBy?: "brandAssets";
 }
@@ -46,7 +48,6 @@ export const SCHEDULED_DEADLINES: ScheduledDeadline[] = [
     appliesTo: "everyone",
     hard: false,
     events: ["DTM27"],
-    trackedBy: "brandAssets",
   },
   {
     date: "2027-02-22",
@@ -84,11 +85,18 @@ export const SCHEDULED_DEADLINES: ScheduledDeadline[] = [
     events: ["DTM27"],
   },
   {
+    // The real cutoff for a partner's logo/branding to reach print, per the
+    // "4. Delivery timeline" Notion page's "Graphic submission deadline"
+    // row — broadened from "exhibiting" to "everyone" (every partner's
+    // branding goes through this pass, not just booth signage) and tagged
+    // as the "logo" obligation's real deadline instead of the softer
+    // 2027-01-25 heads-up above.
     date: "2027-03-29",
     what: "Final graphics submission — everything goes to print the following week",
-    appliesTo: "exhibiting",
+    appliesTo: "everyone",
     hard: true,
     events: ["DTM27"],
+    trackedBy: "brandAssets",
   },
   {
     date: "2027-04-19",
@@ -146,11 +154,15 @@ export const SCHEDULED_DEADLINES: ScheduledDeadline[] = [
     events: ["SPARTA 2027"],
   },
   {
+    // Same "Graphic submission deadline" logic as the DTM27 entry above —
+    // per the "4. Delivery timeline" Notion page, this is the real "logo"
+    // obligation cutoff for every SPARTA27 partner, not just exhibitors.
     date: "2026-12-21",
     what: "Final graphics submission — lounge, session and branding artwork",
-    appliesTo: "exhibiting",
+    appliesTo: "everyone",
     hard: true,
     events: ["SPARTA 2027"],
+    trackedBy: "brandAssets",
   },
   {
     date: "2026-12-21",

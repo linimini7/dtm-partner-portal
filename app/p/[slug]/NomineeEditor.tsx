@@ -18,23 +18,28 @@ export default function NomineeEditor({
   obligationId,
   title,
   initialNominees,
+  maxNominees,
 }: {
   slug: string;
   obligationId: string;
   title: string;
   initialNominees: Nominee[];
+  /** Caps the list at however many seats the partner actually bought (see PartnerObligation.seatLimit) — omitted/null for obligations with no purchased quantity to cap against, e.g. Guardians. */
+  maxNominees?: number | null;
 }) {
   const [nominees, setNominees] = useState<Nominee[]>(
     initialNominees.length > 0 ? initialNominees : [EMPTY_NOMINEE],
   );
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const atLimit = maxNominees != null && nominees.length >= maxNominees;
 
   function updateNominee(index: number, field: keyof Nominee, value: string) {
     setNominees((prev) => prev.map((n, i) => (i === index ? { ...n, [field]: value } : n)));
   }
 
   function addNominee() {
+    if (atLimit) return;
     setNominees((prev) => [...prev, EMPTY_NOMINEE]);
   }
 
@@ -55,7 +60,14 @@ export default function NomineeEditor({
 
   return (
     <div className="mt-2 flex flex-col gap-2.5 border-t border-dtm-hairline pt-2.5">
-      <div className="text-[11px] text-fg-5">Who&apos;s coming — full name, position, and email address</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[11px] text-fg-5">Who&apos;s coming — full name, position, and email address</div>
+        {maxNominees != null && (
+          <div className="shrink-0 whitespace-nowrap text-[11px] text-fg-5">
+            {nominees.length} of {maxNominees} seat{maxNominees === 1 ? "" : "s"}
+          </div>
+        )}
+      </div>
       {nominees.map((nominee, i) => (
         <div key={i} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
           <input
@@ -95,9 +107,11 @@ export default function NomineeEditor({
         </div>
       ))}
       <div className="flex items-center gap-3">
-        <button type="button" onClick={addNominee} className="text-sm" style={{ color: "var(--accent)" }}>
-          + Add another person
-        </button>
+        {!atLimit && (
+          <button type="button" onClick={addNominee} className="text-sm" style={{ color: "var(--accent)" }}>
+            + Add another person
+          </button>
+        )}
         <button
           type="button"
           onClick={handleSave}

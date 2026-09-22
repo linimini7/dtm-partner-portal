@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { workstreamDisplayName, type PortalView, type TabId } from "@/lib/portal-view";
+import type { PortalView, TabId } from "@/lib/portal-view";
 import type { PortalContentFields } from "@/lib/portal-content";
 import { mediaKitEventSlug, type EventMediaKit, type MediaKitEvent } from "@/lib/media-kit";
 import type { BrandAssets } from "@/lib/brand-assets";
@@ -177,8 +177,6 @@ export default function PortalShell({
   slug: string;
 }) {
   const [tab, setTab] = useState<TabId>("overview");
-  const [filter, setFilter] = useState("All");
-  const [done, setDone] = useState<Record<string, boolean>>({});
   const [obligationChecks, setObligationChecks] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(checkedObligationIds.map((id) => [id, true])),
   );
@@ -225,14 +223,6 @@ export default function PortalShell({
       setRedeemedSaving(false);
     }
   }
-
-  const visibleTabs = view.tabs.filter((t) => !t.staffOnly || isStaff);
-  const partnerTabs = visibleTabs.filter((t) => !t.staffOnly);
-  const staffTabs = visibleTabs.filter((t) => t.staffOnly);
-
-  const phases = Array.from(new Set(view.deliverableChecklist.map((a) => a.phase)));
-  const visibleChecklist =
-    filter === "All" ? view.deliverableChecklist : view.deliverableChecklist.filter((a) => a.phase === filter);
 
   /**
    * Overview's "What we need from you" is exactly the Action Items tab's
@@ -540,7 +530,7 @@ export default function PortalShell({
         </div>
 
         <nav className="flex flex-col gap-0.5">
-          {partnerTabs.map((item, i) => (
+          {view.tabs.map((item, i) => (
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
@@ -557,23 +547,17 @@ export default function PortalShell({
             </button>
           ))}
 
-          {staffTabs.length > 0 && (
+          {isStaff && (
             <>
               <div className="my-2 border-t border-dtm-hairline" />
-              {staffTabs.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setTab(item.id)}
-                  className="flex items-center gap-3 w-full text-left text-[13.5px] font-medium px-2.5 py-2 border-0 rounded-[8px] cursor-pointer"
-                  style={{
-                    background: tab === item.id ? "var(--dtm-surface-2)" : "transparent",
-                    color: tab === item.id ? "var(--fg-1)" : "var(--fg-4)",
-                  }}
-                >
-                  <span className="font-mono text-[10px] opacity-50 w-4">••</span>
-                  <span>{item.label}</span>
-                </button>
-              ))}
+              <Link
+                href={`/p/${slug}/admin/deliverables`}
+                className="flex items-center gap-3 w-full text-left text-[13.5px] font-medium px-2.5 py-2 border-0 rounded-[8px]"
+                style={{ color: "var(--fg-4)" }}
+              >
+                <span className="font-mono text-[10px] opacity-50 w-4">••</span>
+                <span>DTM Deliverables</span>
+              </Link>
             </>
           )}
         </nav>
@@ -814,121 +798,6 @@ export default function PortalShell({
             )}
           </div>
         )}
-
-        {tab === "dates" && isStaff && (
-          <div className="flex flex-col gap-[18px]">
-            <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface overflow-hidden">
-              <div className="grid gap-[18px] p-[13px_20px] border-b border-dtm-hairline eyebrow" style={{ gridTemplateColumns: "minmax(96px,120px) minmax(0,1fr) minmax(120px,190px)" }}>
-                <div>Date</div>
-                <div>What we need from you</div>
-                <div>Workstream</div>
-              </div>
-              {view.keyDates.length === 0 && (
-                <div className="p-5 text-sm text-fg-4">No dated deliverables on file yet.</div>
-              )}
-              {view.keyDates.map((d, i) => (
-                <div
-                  key={i}
-                  className="grid gap-[18px] p-[15px_20px] border-b items-start"
-                  style={{ gridTemplateColumns: "minmax(96px,120px) minmax(0,1fr) minmax(120px,190px)", borderColor: "#17171d" }}
-                >
-                  <div className="flex flex-col gap-1.5">
-                    <div
-                      className="font-mono text-[13px]"
-                      style={{ color: d.hard ? "var(--alert)" : "var(--fg-2)", fontWeight: d.hard ? 600 : 400 }}
-                    >
-                      {d.date}
-                    </div>
-                    {d.hard && <Chip color="var(--alert)">Hard</Chip>}
-                  </div>
-                  <div
-                    className="text-[13.5px] leading-[1.55]"
-                    style={{ color: d.hard ? "var(--fg-1)" : "var(--fg-2)", fontWeight: d.hard ? 500 : 400 }}
-                  >
-                    {d.what}
-                  </div>
-                  <div className="text-[12.5px] text-fg-4">{workstreamDisplayName(d.workstream)}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="text-[13px] text-fg-4">
-              Every DTM-owed deliverable, not just dated ones. Tick items off as you complete
-              them.
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {["All", ...phases].map((label) => (
-                <button
-                  key={label}
-                  onClick={() => setFilter(label)}
-                  className="font-mono text-[10.5px] tracking-[0.12em] uppercase px-3 py-1.5 rounded-[6px] cursor-pointer"
-                  style={{
-                    border: `1px solid ${filter === label ? "var(--dtm-hairline-2)" : "var(--dtm-hairline)"}`,
-                    background: filter === label ? "var(--dtm-surface-2)" : "transparent",
-                    color: filter === label ? "var(--fg-1)" : "var(--fg-5)",
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface overflow-hidden">
-              <div className="grid gap-4 p-[13px_20px] border-b border-dtm-hairline eyebrow" style={{ gridTemplateColumns: "34px minmax(0,1fr) minmax(72px,90px) minmax(86px,110px)" }}>
-                <div></div>
-                <div>Deliverable</div>
-                <div>Phase</div>
-                <div>Due</div>
-              </div>
-              {visibleChecklist.length === 0 && (
-                <div className="p-5 text-sm text-fg-4">Nothing on file yet.</div>
-              )}
-              {visibleChecklist.map((a) => {
-                const isDone = !!done[a.id];
-                return (
-                  <div
-                    key={a.id}
-                    className="grid gap-4 p-4 items-center border-b"
-                    style={{ gridTemplateColumns: "34px minmax(0,1fr) minmax(72px,90px) minmax(86px,110px)", borderColor: "#17171d" }}
-                  >
-                    <button
-                      onClick={() => setDone((s) => ({ ...s, [a.id]: !s[a.id] }))}
-                      className="w-[19px] h-[19px] rounded-[5px] grid place-items-center text-[11px] cursor-pointer p-0"
-                      style={{
-                        border: `1px solid ${isDone ? "var(--accent)" : "var(--dtm-hairline-2)"}`,
-                        background: isDone ? "var(--accent)" : "transparent",
-                        color: "var(--dtm-ink)",
-                      }}
-                    >
-                      {isDone ? "✓" : ""}
-                    </button>
-                    <div
-                      className="text-[13.5px]"
-                      style={{
-                        color: isDone ? "#5a5a66" : "var(--fg-1)",
-                        textDecoration: isDone ? "line-through" : "none",
-                      }}
-                    >
-                      {a.title}
-                    </div>
-                    <div>
-                      <Chip color="var(--fg-5)" bg="var(--dtm-surface-2)">
-                        {a.phase}
-                      </Chip>
-                    </div>
-                    <div className="font-mono text-xs" style={{ color: isDone ? "#4e4e5a" : "var(--fg-3)" }}>
-                      {a.due ?? "—"}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="text-xs text-fg-5">
-              Checking items off here is local to your browser for now — it doesn&apos;t save
-              anywhere yet.
-            </div>
-          </div>
-        )}
-
 
         {tab === "assets" && (() => {
           // Each "Coming your way" item moves out into its own box in the

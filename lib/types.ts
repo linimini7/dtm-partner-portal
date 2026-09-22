@@ -72,6 +72,7 @@ export interface PortalSummary {
     deadlineDate: string | null;
     deadlineHard: boolean;
     deadlineDaysAway: number | null;
+    seatLimit: number | null;
   }[];
 }
 

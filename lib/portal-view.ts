@@ -26,7 +26,7 @@ import type { Deliverable, EventName, PortalDetail } from "@/lib/types";
  * PortalDetail, never routed through this file.
  */
 
-export type TabId = "overview" | "dates" | "assets" | "actions";
+export type TabId = "overview" | "assets" | "actions";
 
 export interface PackageRow {
   label: string;
@@ -79,20 +79,15 @@ export interface KeyDateRow {
   hard: boolean;
 }
 
-export interface ActionItem {
-  id: string;
-  title: string;
-  phase: string;
-  due: string | null;
-}
-
 /**
  * What the PARTNER owes DTM (every real contract's "Partner Deliverables"
  * section — logo & guidelines, announce the partnership, nominate
- * Guardians), as opposed to `ActionItem` which is what DTM owes the
- * partner. Not modeled in Attio (confirmed decision) — these three items
- * repeat near-identically across every contract read so far, so deriving
- * them is a reasonable default, not an invention.
+ * Guardians), as opposed to what DTM owes the partner (see
+ * lib/dtm-deliverables.ts — DTM-internal, staff-only, never routed through
+ * this file; see the warning above). Not modeled in Attio (confirmed
+ * decision) — these three items repeat near-identically across every
+ * contract read so far, so deriving them is a reasonable default, not an
+ * invention.
  */
 export interface PartnerObligation {
   id: string;
@@ -111,6 +106,17 @@ export interface PartnerObligation {
   deadlineHard: boolean;
   /** Days from today to deadlineDate, clamped at 0 once passed — null alongside deadlineDate when there's no match. */
   deadlineDaysAway: number | null;
+  /**
+   * How many named attendees this obligation can actually hold — the sum of
+   * `quantity` across the deliverable(s) that earned it (a deliverable with
+   * no quantity counts as 1). Only set for the named-attendee programme
+   * seats (LP-GP Marketplace, CXO/CVC Summit, Investor Dinner), where the
+   * partner bought a specific number of seats and shouldn't be able to name
+   * more people than that. Null everywhere else, including Guardians —
+   * that one's explicitly open-ended ("the earlier you nominate, the
+   * better"), not tied to a purchased quantity.
+   */
+  seatLimit: number | null;
 }
 
 // Programme seats (CXO Summit / CVC Summit / LP-GP Marketplace) and
@@ -156,6 +162,7 @@ export function derivePartnerObligations(scopedEvents: EventName[], deliverables
       deadlineDate: null,
       deadlineHard: false,
       deadlineDaysAway: null,
+      seatLimit: null,
     },
     {
       id: "announce",
@@ -164,6 +171,7 @@ export function derivePartnerObligations(scopedEvents: EventName[], deliverables
       deadlineDate: null,
       deadlineHard: false,
       deadlineDaysAway: null,
+      seatLimit: null,
     },
   ];
   if (scopedEvents.includes("DTM27")) {
@@ -174,17 +182,21 @@ export function derivePartnerObligations(scopedEvents: EventName[], deliverables
       deadlineDate: null,
       deadlineHard: false,
       deadlineDaysAway: null,
+      seatLimit: null,
     });
   }
   for (const programme of NAMED_ATTENDEE_PROGRAMMES) {
-    if (deliverables.some((d) => programme.match.test(d.name))) {
+    const matches = deliverables.filter((d) => programme.match.test(d.name));
+    if (matches.length > 0) {
+      const seatLimit = matches.reduce((sum, d) => sum + (d.quantity ?? 1), 0);
       partnerObligations.push({
         id: programme.id,
         title: `Nominate your attendee(s) for ${programme.label}`,
-        note: "Let us know who's coming so we can confirm their seat.",
+        note: `Let us know who's coming so we can confirm their seat (Senior or C-level contacts only). You have ${seatLimit} seat${seatLimit === 1 ? "" : "s"}.`,
         deadlineDate: null,
         deadlineHard: false,
         deadlineDaysAway: null,
+        seatLimit,
       });
     }
   }
@@ -200,6 +212,7 @@ export function derivePartnerObligations(scopedEvents: EventName[], deliverables
         deadlineDate: null,
         deadlineHard: false,
         deadlineDaysAway: null,
+        seatLimit: null,
       });
       partnerObligations.push({
         id: `${slotType.idPrefix}-topic-${d.id}`,
@@ -208,6 +221,7 @@ export function derivePartnerObligations(scopedEvents: EventName[], deliverables
         deadlineDate: null,
         deadlineHard: false,
         deadlineDaysAway: null,
+        seatLimit: null,
       });
     }
   }
@@ -255,8 +269,6 @@ export interface PortalView {
   ticketItems: Deliverable[];
   hasBooth: boolean;
   boothItems: Deliverable[];
-  /** Every DTM-owed deliverable, for the staff-only Key Dates checklist. */
-  deliverableChecklist: ActionItem[];
   /** What the partner owes DTM — the partner-visible Action Items tab AND the Overview tab's "What we need from you" summary (the same list, filtered to what's still open — see PortalShell). */
   partnerObligations: PartnerObligation[];
   /** The real submit-by date for logo/website/description (the one ScheduledDeadline tagged `trackedBy: "brandAssets"`), for the "Tickets & assets" tab's BrandAssetsCard — null if no such deadline applies to this partner's scoped events. */
@@ -436,8 +448,13 @@ export function buildPortalView(
   // The real deadline for logo/website/description — shown as a "Submit by"
   // badge the same way the tickets card shows "Redeem by", regardless of
   // whether it's already complete (completion is tracked separately, off
-  // real brandAssets data — see PortalShell's openPartnerObligations).
-  const brandAssetsDeadlineEntry = applicableDeadlines.find((d) => d.trackedBy === "brandAssets");
+  // real brandAssets data — see PortalShell's openPartnerObligations). A
+  // dual-event partner can match both DTM27's and SPARTA27's graphic
+  // submission deadlines — the earlier one is the real binding cutoff, not
+  // whichever happens to come first in SCHEDULED_DEADLINES.
+  const brandAssetsDeadlineEntry = applicableDeadlines
+    .filter((d) => d.trackedBy === "brandAssets")
+    .sort((a, b) => a.date.localeCompare(b.date))[0];
   const brandAssetsDeadline = brandAssetsDeadlineEntry ? brandAssetsDeadlineEntry.date : null;
 
   const keyDates: KeyDateRow[] = [
@@ -451,12 +468,6 @@ export function buildPortalView(
       })),
     ...scheduledDeadlineRows,
   ].sort((a, b) => a.date.localeCompare(b.date));
-
-  // Every DTM-owed deliverable — this is the full internal ops checklist,
-  // now staff-only (merged in from the old partner-facing Action Items tab).
-  const deliverableChecklist: ActionItem[] = [...deliverables]
-    .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"))
-    .map((d) => ({ id: d.id, title: formatDeliverableName(d), phase: d.phase || "—", due: d.dueDate }));
 
   // One card per scoped event — a partner sponsoring both DTM27 and SPARTA27
   // gets each event's own dates/venue, deliverables and practical links kept
@@ -549,7 +560,6 @@ export function buildPortalView(
     { id: "overview", label: "Overview" },
     { id: "assets", label: "Tickets & assets" },
     { id: "actions", label: "Action items" },
-    { id: "dates", label: "DTM Deliverables", staffOnly: true },
   ];
 
   return {
@@ -564,7 +574,6 @@ export function buildPortalView(
     ticketItems: passes,
     hasBooth: booth.length > 0,
     boothItems: booth,
-    deliverableChecklist,
     partnerObligations,
     brandAssetsDeadline,
     workstreamsPresent: Array.from(new Set(deliverables.map((d) => d.workstream))).filter(Boolean),
