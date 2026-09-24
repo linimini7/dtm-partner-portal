@@ -37,6 +37,11 @@ function eventLabel(event: string): string {
   return event === "SPARTA 2027" ? "SPARTA27" : event;
 }
 
+/** When a partner has both events, show SPARTA27 first — this only reorders how the list renders, not the underlying data. */
+function displayEvents(events: readonly string[]): string[] {
+  return [...events].sort((a, b) => (a === "SPARTA 2027" ? -1 : b === "SPARTA 2027" ? 1 : 0)).map(eventLabel);
+}
+
 const BOTH_EVENTS_FILTER = "DTM27 & SPARTA 2027";
 
 interface SortKey {
@@ -52,7 +57,7 @@ function sortValue(row: Row, column: ColumnKey): string | number | null {
     case "code":
       return row.accessCode;
     case "events":
-      return row.events.map(eventLabel).join(", ");
+      return displayEvents(row.events).join(", ");
     case "csStage":
       return row.csStage;
     case "salesLead":
@@ -718,9 +723,9 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
                 </td>
                 <td
                   className="overflow-hidden truncate px-3 py-2"
-                  title={r.events.map(eventLabel).join(", ")}
+                  title={displayEvents(r.events).join(", ")}
                 >
-                  {r.events.map(eventLabel).join(", ")}
+                  {displayEvents(r.events).join(", ")}
                 </td>
                 <td className="overflow-hidden truncate px-3 py-2">{r.csStage ?? "—"}</td>
                 <td className="overflow-hidden truncate px-3 py-2" title={r.salesLeadName || undefined}>
