@@ -5,10 +5,9 @@ import { getMediaKit, getRawPortalContent, mediaKitEventSlug } from "@/lib/porta
 import { listDtmContacts } from "@/lib/dtm-contacts";
 import ImageDropField from "../../p/[slug]/ImageDropField";
 import SaveMediaKitButton from "../../p/[slug]/admin/SaveMediaKitButton";
+import DtmContactForm from "./DtmContactForm";
+import AddDtmContactForm from "./AddDtmContactForm";
 import {
-  addDtmContactAction,
-  deleteDtmContactAction,
-  updateDtmContactAction,
   updateGlobalExhibitorGuidelines,
   updateGlobalFloorPlanUrl,
   updateGlobalHotelBookingUrl,
@@ -50,141 +49,11 @@ export default async function PortalSettingsPage() {
           someone needs to be covered for or added.
         </p>
         <div className="flex flex-col gap-4">
-          {dtmContacts.map((c) => {
-            const updateThis = updateDtmContactAction.bind(null, c.id);
-            const deleteThis = deleteDtmContactAction.bind(null, c.id);
-            return (
-              <form
-                key={c.id}
-                action={updateThis}
-                className="grid gap-3 rounded-[10px] border border-dtm-hairline p-4 sm:grid-cols-2 lg:grid-cols-4"
-              >
-                <label className="block text-sm">
-                  <span className="mb-1 block text-fg-3">Name</span>
-                  <input
-                    type="text"
-                    name="name"
-                    defaultValue={c.name}
-                    required
-                    className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="mb-1 block text-fg-3">Role</span>
-                  <input
-                    type="text"
-                    name="role"
-                    defaultValue={c.role ?? ""}
-                    placeholder="e.g. Head of Operations"
-                    className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="mb-1 block text-fg-3">Email</span>
-                  <input
-                    type="email"
-                    name="contactEmail"
-                    defaultValue={c.email ?? ""}
-                    className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="mb-1 block text-fg-3">Phone</span>
-                  <input
-                    type="tel"
-                    name="phone"
-                    defaultValue={c.phone ?? ""}
-                    placeholder="Add phone number"
-                    className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
-                  />
-                </label>
-                <label className="block text-sm sm:col-span-2 lg:col-span-3">
-                  <span className="mb-1 block text-fg-3">Status (optional)</span>
-                  <input
-                    type="text"
-                    name="status"
-                    defaultValue={c.status ?? ""}
-                    placeholder="e.g. On maternal leave — contact Jonas instead"
-                    className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
-                  />
-                </label>
-                <div className="flex items-end gap-3 sm:col-span-2 lg:col-span-1">
-                  <button
-                    type="submit"
-                    className="rounded-[8px] px-4 py-2 text-sm font-medium"
-                    style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="submit"
-                    formAction={deleteThis}
-                    className="rounded-[8px] border border-dtm-hairline px-4 py-2 text-sm text-fg-3"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </form>
-            );
-          })}
+          {dtmContacts.map((c) => (
+            <DtmContactForm key={c.id} contact={c} />
+          ))}
 
-          <form
-            action={addDtmContactAction}
-            className="grid gap-3 rounded-[10px] border border-dashed border-dtm-hairline p-4 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            <p className="text-sm text-fg-3 sm:col-span-2 lg:col-span-4">Add another contact</p>
-            <label className="block text-sm">
-              <span className="mb-1 block text-fg-3">Name</span>
-              <input
-                type="text"
-                name="name"
-                required
-                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-fg-3">Role</span>
-              <input
-                type="text"
-                name="role"
-                placeholder="e.g. Head of Operations"
-                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-fg-3">Email</span>
-              <input
-                type="email"
-                name="contactEmail"
-                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-fg-3">Phone</span>
-              <input
-                type="tel"
-                name="phone"
-                placeholder="Add phone number"
-                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
-              />
-            </label>
-            <label className="block text-sm sm:col-span-2 lg:col-span-3">
-              <span className="mb-1 block text-fg-3">Status (optional)</span>
-              <input
-                type="text"
-                name="status"
-                placeholder="e.g. On maternal leave — contact Jonas instead"
-                className="w-full rounded-[8px] border border-dtm-hairline bg-dtm-ink px-3 py-2 text-fg-1"
-              />
-            </label>
-            <button
-              type="submit"
-              className="self-start rounded-[8px] px-4 py-2 text-sm font-medium"
-              style={{ background: "var(--accent)", color: "var(--dtm-ink)" }}
-            >
-              Add contact
-            </button>
-          </form>
+          <AddDtmContactForm />
         </div>
       </div>
 
