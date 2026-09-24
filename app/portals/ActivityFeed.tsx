@@ -51,12 +51,7 @@ export default function ActivityFeed({
 
   return (
     <div className="rounded-[var(--radius-card)] border border-dtm-hairline bg-dtm-surface p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="eyebrow">Recent partner activity</p>
-        <Link href="/portals/activity" className="text-xs font-medium" style={{ color: "var(--accent)" }}>
-          See all →
-        </Link>
-      </div>
+      <p className="eyebrow mb-3">Recent partner activity</p>
       <div className="flex flex-col gap-2.5">
         {entries.map((entry) => (
           <div key={entry.id} className="flex items-baseline justify-between gap-3 text-sm">
