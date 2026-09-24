@@ -49,9 +49,6 @@ export default async function PortalsPage() {
           <h1 className="text-3xl">Customer Success Platform</h1>
         </div>
         <div className="text-right">
-          <p className="mb-2 text-sm text-fg-3">
-            Welcome, {session.user?.name ?? session.user?.email}
-          </p>
           <div className="flex items-center justify-end gap-2">
             <HeaderIconLink href="/portals/activity" label="Notifications — recent partner activity">
               <BellIcon />
@@ -60,6 +57,9 @@ export default async function PortalsPage() {
               <GearIcon />
             </HeaderIconLink>
           </div>
+          <p className="mt-2 text-sm text-fg-3">
+            Welcome, {session.user?.name ?? session.user?.email}
+          </p>
         </div>
       </div>
       <div className="mb-6">
