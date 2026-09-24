@@ -26,7 +26,6 @@ const COLUMNS = [
   { key: "contract", label: "Contract", width: 85, min: 80 },
   { key: "deliverables", label: "Deliverables", width: 95, min: 90 },
   { key: "partnerDeliverables", label: "Receivables", width: 130, min: 130 },
-  { key: "status", label: "Status", width: 90, min: 90 },
   { key: "logoPng", label: "Logo - PNG", width: 90, min: 80 },
   { key: "logoVector", label: "Logo - Vector/SVG", width: 120, min: 100 },
 ] as const;
@@ -68,8 +67,6 @@ function sortValue(row: Row, column: ColumnKey): string | number | null {
       return row.partnerDeliverablesTotal > 0
         ? row.partnerDeliverablesDone / row.partnerDeliverablesTotal
         : null;
-    case "status":
-      return row.onboardingStage;
     case "logoPng":
       return row.hasPngLogo ? 1 : 0;
     case "logoVector":
@@ -108,7 +105,6 @@ type FilterField =
   | "contract"
   | "deliverables"
   | "partnerDeliverables"
-  | "status"
   | "logoPng"
   | "logoVector";
 
@@ -127,7 +123,6 @@ const FILTER_FIELD_LABELS: Record<FilterField, string> = {
   contract: "Contract",
   deliverables: "Deliverables",
   partnerDeliverables: "Receivables",
-  status: "Status",
   logoPng: "Logo - PNG",
   logoVector: "Logo - Vector/SVG",
 };
@@ -158,8 +153,6 @@ function matchesFilterRule(row: Row, rule: FilterRule): boolean {
       const complete = row.partnerDeliverablesTotal > 0 && row.partnerDeliverablesDone === row.partnerDeliverablesTotal;
       return rule.value === "Complete" ? complete : !complete;
     }
-    case "status":
-      return rule.value === "Live" ? row.onboardingStage === "Portal live" : row.onboardingStage !== "Portal live";
     case "logoPng":
       return rule.value === "Yes" ? row.hasPngLogo : !row.hasPngLogo;
     case "logoVector":
@@ -456,11 +449,6 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
         return [
           { value: "Complete", label: "Complete" },
           { value: "Incomplete", label: "Incomplete" },
-        ];
-      case "status":
-        return [
-          { value: "Live", label: "Live" },
-          { value: "Draft", label: "Draft" },
         ];
       case "logoPng":
       case "logoVector":
@@ -760,13 +748,6 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
                   style={r.partnerDeliverablesTotal === 0 ? { color: "var(--alert)" } : undefined}
                 >
                   {r.partnerDeliverablesDone}/{r.partnerDeliverablesTotal}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  {r.onboardingStage === "Portal live" ? (
-                    <StatusPill label="Live" tone="ok" />
-                  ) : (
-                    <StatusPill label="Draft" tone="neutral" />
-                  )}
                 </td>
                 <td className="px-3 py-2 text-center">
                   {r.hasPngLogo ? <span style={{ color: "var(--ok)" }}>✓</span> : <span className="text-fg-5">—</span>}
