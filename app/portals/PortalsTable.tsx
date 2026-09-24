@@ -11,18 +11,24 @@ interface Row extends PortalSummary {
   /** How much of what the partner owes DTM (logo/guidelines, announce, Guardians, named-attendee seats) is actually done — see lib/portal-view.ts's getPartnerObligationProgress. */
   partnerDeliverablesDone: number;
   partnerDeliverablesTotal: number;
+  /** At least one logo slot in a plain raster format (see lib/brand-assets.ts's logoFormatLabel). */
+  hasPngLogo: boolean;
+  /** At least one logo slot in a vector format (SVG or EPS). */
+  hasVectorLogo: boolean;
 }
 
 const COLUMNS = [
-  { key: "company", label: "Company", width: 190, min: 110 },
-  { key: "code", label: "Access code", width: 130, min: 100 },
-  { key: "events", label: "Event(s)", width: 175, min: 80 },
-  { key: "csStage", label: "CS stage", width: 130, min: 90 },
-  { key: "salesLead", label: "Sales lead", width: 165, min: 90 },
-  { key: "contract", label: "Contract", width: 100, min: 80 },
-  { key: "deliverables", label: "Deliverables", width: 110, min: 90 },
-  { key: "partnerDeliverables", label: "Receivables", width: 170, min: 130 },
-  { key: "portalStatus", label: "Portal status", width: 130, min: 90 },
+  { key: "company", label: "Company", width: 170, min: 110 },
+  { key: "code", label: "Access code", width: 110, min: 100 },
+  { key: "events", label: "Event(s)", width: 130, min: 80 },
+  { key: "csStage", label: "CS stage", width: 110, min: 90 },
+  { key: "salesLead", label: "Sales lead", width: 130, min: 90 },
+  { key: "contract", label: "Contract", width: 85, min: 80 },
+  { key: "deliverables", label: "Deliverables", width: 95, min: 90 },
+  { key: "partnerDeliverables", label: "Receivables", width: 130, min: 130 },
+  { key: "status", label: "Status", width: 90, min: 90 },
+  { key: "logoPng", label: "Logo PNG", width: 80, min: 70 },
+  { key: "logoVector", label: "Logo vector", width: 90, min: 80 },
 ] as const;
 
 type ColumnKey = (typeof COLUMNS)[number]["key"];
@@ -62,8 +68,12 @@ function sortValue(row: Row, column: ColumnKey): string | number | null {
       return row.partnerDeliverablesTotal > 0
         ? row.partnerDeliverablesDone / row.partnerDeliverablesTotal
         : null;
-    case "portalStatus":
+    case "status":
       return row.onboardingStage;
+    case "logoPng":
+      return row.hasPngLogo ? 1 : 0;
+    case "logoVector":
+      return row.hasVectorLogo ? 1 : 0;
     default:
       return null;
   }
@@ -88,8 +98,19 @@ function sortRows(rows: Row[], sortKeys: SortKey[]): Row[] {
   });
 }
 
-/** Every filterable field, Attio-style — pick a field, pick a value, add as many rules as you want, all AND'd together. Free-text company search stays a separate always-visible box rather than becoming a rule type, since it's the single most common action here. */
-type FilterField = "event" | "csStage" | "salesLead" | "contract" | "portalStatus";
+/** Every column is a filterable field, Attio-style — pick one, pick a value, add as many rules as you want, all AND'd together. Company and Access code sit alongside the always-visible free-text search box (a dropdown of exact values, useful for e.g. sharing a saved filter link) rather than replacing it. */
+type FilterField =
+  | "company"
+  | "code"
+  | "event"
+  | "csStage"
+  | "salesLead"
+  | "contract"
+  | "deliverables"
+  | "partnerDeliverables"
+  | "status"
+  | "logoPng"
+  | "logoVector";
 
 interface FilterRule {
   field: FilterField;
@@ -98,16 +119,26 @@ interface FilterRule {
 }
 
 const FILTER_FIELD_LABELS: Record<FilterField, string> = {
+  company: "Company",
+  code: "Access code",
   event: "Event",
   csStage: "CS stage",
   salesLead: "Sales lead",
   contract: "Contract",
-  portalStatus: "Portal status",
+  deliverables: "Deliverables",
+  partnerDeliverables: "Receivables",
+  status: "Status",
+  logoPng: "Logo PNG",
+  logoVector: "Logo vector",
 };
 
 function matchesFilterRule(row: Row, rule: FilterRule): boolean {
   if (!rule.value) return true;
   switch (rule.field) {
+    case "company":
+      return row.companyName === rule.value;
+    case "code":
+      return row.accessCode === rule.value;
     case "event":
       if (rule.value === BOTH_EVENTS_FILTER) {
         return row.events.includes("DTM27" as never) && row.events.includes("SPARTA 2027" as never);
@@ -119,8 +150,20 @@ function matchesFilterRule(row: Row, rule: FilterRule): boolean {
       return row.salesLeadName === rule.value;
     case "contract":
       return rule.value === "On file" ? row.hasContract : !row.hasContract;
-    case "portalStatus":
+    case "deliverables": {
+      const complete = row.deliverablesTotal > 0 && row.deliverablesDone === row.deliverablesTotal;
+      return rule.value === "Complete" ? complete : !complete;
+    }
+    case "partnerDeliverables": {
+      const complete = row.partnerDeliverablesTotal > 0 && row.partnerDeliverablesDone === row.partnerDeliverablesTotal;
+      return rule.value === "Complete" ? complete : !complete;
+    }
+    case "status":
       return rule.value === "Live" ? row.onboardingStage === "Portal live" : row.onboardingStage !== "Portal live";
+    case "logoPng":
+      return rule.value === "Yes" ? row.hasPngLogo : !row.hasPngLogo;
+    case "logoVector":
+      return rule.value === "Yes" ? row.hasVectorLogo : !row.hasVectorLogo;
   }
 }
 
@@ -382,9 +425,21 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
     () => Array.from(new Set(rows.map((r) => r.salesLeadName).filter(Boolean))).sort(),
     [rows],
   );
+  const companies = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.companyName))).sort(),
+    [rows],
+  );
+  const accessCodes = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.accessCode))).sort(),
+    [rows],
+  );
 
   function filterFieldOptions(field: FilterField): { value: string; label: string }[] {
     switch (field) {
+      case "company":
+        return companies.map((c) => ({ value: c, label: c }));
+      case "code":
+        return accessCodes.map((c) => ({ value: c, label: c }));
       case "event":
         return events.map((e) => ({ value: e, label: e === BOTH_EVENTS_FILTER ? "DTM27 & SPARTA27" : eventLabel(e) }));
       case "csStage":
@@ -396,10 +451,22 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
           { value: "On file", label: "On file" },
           { value: "Missing", label: "Missing" },
         ];
-      case "portalStatus":
+      case "deliverables":
+      case "partnerDeliverables":
+        return [
+          { value: "Complete", label: "Complete" },
+          { value: "Incomplete", label: "Incomplete" },
+        ];
+      case "status":
         return [
           { value: "Live", label: "Live" },
           { value: "Draft", label: "Draft" },
+        ];
+      case "logoPng":
+      case "logoVector":
+        return [
+          { value: "Yes", label: "Yes" },
+          { value: "No", label: "No" },
         ];
     }
   }
@@ -590,16 +657,6 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
             </div>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={() =>
-            setWidths(Object.fromEntries(COLUMNS.map((c) => [c.key, c.width])) as Record<ColumnKey, number>)
-          }
-          className="rounded-[var(--radius-panel)] border border-dtm-hairline px-3 py-2 text-sm text-fg-3"
-        >
-          Reset column widths
-        </button>
       </div>
       <div className="mb-4 -mt-2 text-xs text-fg-5">
         Click a column to sort by it · shift-click another to add it as a tiebreaker, or use the Sort button
@@ -619,8 +676,13 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
               {COLUMNS.map((c) => {
                 const sortIndex = sortKeys.findIndex((k) => k.column === c.key);
                 const active = sortIndex !== -1 ? sortKeys[sortIndex] : null;
+                const frozen = c.key === "company";
                 return (
-                  <th key={c.key} className="relative overflow-hidden px-3 py-2 font-normal">
+                  <th
+                    key={c.key}
+                    className={`relative overflow-hidden px-3 py-2 font-normal ${frozen ? "sticky left-0 z-10" : ""}`}
+                    style={frozen ? { background: "var(--dtm-ink)" } : undefined}
+                  >
                     <button
                       type="button"
                       title={
@@ -648,10 +710,20 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
           <tbody>
             {sorted.map((r) => (
               <tr key={r.slug} className="border-b border-dtm-hairline last:border-0">
-                <td className="overflow-hidden px-3 py-2">
-                  <Link href={`/p/${r.slug}`} className="block truncate text-fg-accent" title={r.companyName}>
-                    {r.companyName}
-                  </Link>
+                <td
+                  className="sticky left-0 z-10 overflow-hidden px-3 py-2"
+                  style={{ background: "var(--dtm-ink)" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: r.onboardingStage === "Portal live" ? "var(--ok)" : "var(--fg-5)" }}
+                      title={r.onboardingStage === "Portal live" ? "Live" : "Draft"}
+                    />
+                    <Link href={`/p/${r.slug}`} className="block truncate text-fg-accent" title={r.companyName}>
+                      {r.companyName}
+                    </Link>
+                  </div>
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   <CopyCode code={r.accessCode} />
@@ -695,6 +767,12 @@ export default function PortalsTable({ rows, staffEmail }: { rows: Row[]; staffE
                   ) : (
                     <StatusPill label="Draft" tone="neutral" />
                   )}
+                </td>
+                <td className="px-3 py-2 text-center">
+                  {r.hasPngLogo ? <span style={{ color: "var(--ok)" }}>✓</span> : <span className="text-fg-5">—</span>}
+                </td>
+                <td className="px-3 py-2 text-center">
+                  {r.hasVectorLogo ? <span style={{ color: "var(--ok)" }}>✓</span> : <span className="text-fg-5">—</span>}
                 </td>
               </tr>
             ))}

@@ -34,6 +34,8 @@ export default async function PortalsPage() {
         accessCode: getPortalCode(c.slug),
         partnerDeliverablesDone: partnerProgress.done,
         partnerDeliverablesTotal: partnerProgress.total,
+        hasPngLogo: brandAssets.logoSlots.some((s) => s.format === "PNG"),
+        hasVectorLogo: brandAssets.logoSlots.some((s) => s.format === "SVG" || s.format === "EPS"),
       };
     }),
   );
@@ -44,15 +46,21 @@ export default async function PortalsPage() {
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <p className="eyebrow mb-2">DTM Partner Portal · Staff</p>
-          <h1 className="text-3xl">Partner portals</h1>
+          <h1 className="text-3xl">Customer Success Platform</h1>
         </div>
-        <Link href="/portals/settings" className="text-sm">
-          Global portal settings →
-        </Link>
+        <div className="text-right">
+          <p className="mb-1 text-sm text-fg-3">
+            Welcome, {session.user?.name ?? session.user?.email}
+          </p>
+          <Link href="/portals/settings" className="text-sm">
+            Global portal settings →
+          </Link>
+        </div>
       </div>
       <div className="mb-6">
         <ActivityFeed entries={recentActivity} companyNames={companyNames} />
       </div>
+      <h2 className="mb-3 text-xl text-fg-1">Partner Portals – Overview</h2>
       <PortalsTable rows={rows} staffEmail={session.user?.email} />
     </main>
   );
