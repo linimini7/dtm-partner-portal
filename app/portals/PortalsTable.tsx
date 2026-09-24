@@ -18,17 +18,17 @@ interface Row extends PortalSummary {
 }
 
 const COLUMNS = [
-  { key: "company", label: "Company", width: 170, min: 110 },
+  { key: "company", label: "Company", width: 160, min: 110 },
   { key: "code", label: "Access code", width: 110, min: 100 },
-  { key: "events", label: "Event(s)", width: 130, min: 80 },
-  { key: "csStage", label: "CS stage", width: 110, min: 90 },
-  { key: "salesLead", label: "Sales lead", width: 130, min: 90 },
+  { key: "events", label: "Event(s)", width: 120, min: 80 },
+  { key: "csStage", label: "CS stage", width: 100, min: 90 },
+  { key: "salesLead", label: "Sales lead", width: 120, min: 90 },
   { key: "contract", label: "Contract", width: 85, min: 80 },
   { key: "deliverables", label: "Deliverables", width: 95, min: 90 },
   { key: "partnerDeliverables", label: "Receivables", width: 130, min: 130 },
   { key: "status", label: "Status", width: 90, min: 90 },
-  { key: "logoPng", label: "Logo PNG", width: 80, min: 70 },
-  { key: "logoVector", label: "Logo vector", width: 90, min: 80 },
+  { key: "logoPng", label: "Logo - PNG", width: 90, min: 80 },
+  { key: "logoVector", label: "Logo - Vector/SVG", width: 120, min: 100 },
 ] as const;
 
 type ColumnKey = (typeof COLUMNS)[number]["key"];
@@ -128,8 +128,8 @@ const FILTER_FIELD_LABELS: Record<FilterField, string> = {
   deliverables: "Deliverables",
   partnerDeliverables: "Receivables",
   status: "Status",
-  logoPng: "Logo PNG",
-  logoVector: "Logo vector",
+  logoPng: "Logo - PNG",
+  logoVector: "Logo - Vector/SVG",
 };
 
 function matchesFilterRule(row: Row, rule: FilterRule): boolean {
