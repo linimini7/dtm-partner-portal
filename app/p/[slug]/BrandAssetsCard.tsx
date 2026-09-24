@@ -110,21 +110,33 @@ export default function BrandAssetsCard({
           <span className="text-[11px] text-fg-5">Logos</span>
           {filledLogos.length > 0 ? (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
-              {filledLogos.map(({ slot }) => (
+              {filledLogos.map(({ slot, format }) => (
                 <a
                   key={slot}
                   href={`/api/portal-logo/${slug}/${slot}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex h-24 items-center justify-center overflow-hidden rounded-[8px] border"
+                  className="relative flex h-24 items-center justify-center overflow-hidden rounded-[8px] border"
                   style={{ borderColor: "var(--dtm-hairline-2)", background: "var(--dtm-ink-2)" }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/portal-logo/${slug}/${slot}`}
-                    alt={`Logo ${slot}`}
-                    className="max-h-full max-w-full object-contain"
-                  />
+                  {format === "EPS" ? (
+                    <span className="px-2 text-center text-[10px] text-fg-5">No preview</span>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/portal-logo/${slug}/${slot}`}
+                      alt={`Logo ${slot}`}
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  )}
+                  {format && (
+                    <span
+                      className="absolute top-1 right-1 rounded-[4px] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.06em]"
+                      style={{ background: "var(--dtm-ink)", color: "var(--fg-3)" }}
+                    >
+                      {format}
+                    </span>
+                  )}
                 </a>
               ))}
             </div>
@@ -192,7 +204,7 @@ export default function BrandAssetsCard({
       </label>
 
       <div>
-        <div className="mb-2 text-sm text-fg-3">Logos (up to 20, high resolution)</div>
+        <div className="mb-2 text-sm text-fg-3">Logos</div>
         <LogoSlotsField key={logoFillKey} slug={slug} initialSlots={brandAssets.logoSlots} />
 
         <div className="mt-3 flex items-center gap-2 text-sm">

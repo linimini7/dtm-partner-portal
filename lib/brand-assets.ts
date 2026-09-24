@@ -17,7 +17,30 @@ export type BrandLogoSlot = number;
 export interface BrandAssets {
   websiteUrl: string | null;
   description: string | null;
-  logoSlots: { slot: BrandLogoSlot; hasImage: boolean }[];
+  /** `format` is a short display label ("PNG", "EPS", ...) shown in the corner of each logo tile — null only when the slot is empty. "EPS" specifically also marks a slot no browser can render inline as an `<img>`, so the UI shows a file-type tile instead of attempting a preview (see LogoSlotsField / BrandAssetsCard). */
+  logoSlots: { slot: BrandLogoSlot; hasImage: boolean; format: string | null }[];
+}
+
+/**
+ * Filename beats claimed mime type here — the browser's reported type for a
+ * .eps file is unreliable (see lib/email-ingestion.ts's UNSUPPORTED_LOGO_EXTENSIONS,
+ * which hit the same problem with real partner attachments), so this checks
+ * the filename extension first and only falls back to the mime type.
+ */
+export function logoFormatLabel(mimeType: string | null, filename: string | null): string {
+  const extMatch = filename?.toLowerCase().match(/\.([a-z0-9]+)$/);
+  if (extMatch) return extMatch[1] === "jpeg" ? "JPG" : extMatch[1].toUpperCase();
+  if (mimeType === "application/postscript" || mimeType === "application/eps" || mimeType === "application/x-eps") {
+    return "EPS";
+  }
+  const mimeMatch = mimeType?.match(/^image\/([a-z0-9+.-]+)$/);
+  if (mimeMatch) {
+    const sub = mimeMatch[1];
+    if (sub === "jpeg") return "JPG";
+    if (sub === "svg+xml") return "SVG";
+    return sub.toUpperCase();
+  }
+  return "FILE";
 }
 
 export async function getBrandAssets(slug: string): Promise<BrandAssets> {
@@ -26,13 +49,19 @@ export async function getBrandAssets(slug: string): Promise<BrandAssets> {
       "SELECT brand_website_url, brand_description FROM portal_content WHERE scope = $1",
       [slug],
     ),
-    getPool().query<{ slot: number }>("SELECT slot FROM portal_logos WHERE scope = $1", [slug]),
+    getPool().query<{ slot: number; mime_type: string | null; filename: string | null }>(
+      "SELECT slot, mime_type, filename FROM portal_logos WHERE scope = $1",
+      [slug],
+    ),
   ]);
-  const filledSlots = new Set(logoResult.rows.map((r) => r.slot));
+  const filledSlots = new Map(logoResult.rows.map((r) => [r.slot, r]));
   return {
     websiteUrl: infoResult.rows[0]?.brand_website_url ?? null,
     description: infoResult.rows[0]?.brand_description ?? null,
-    logoSlots: BRAND_LOGO_SLOTS.map((slot) => ({ slot, hasImage: filledSlots.has(slot) })),
+    logoSlots: BRAND_LOGO_SLOTS.map((slot) => {
+      const row = filledSlots.get(slot);
+      return { slot, hasImage: !!row, format: row ? logoFormatLabel(row.mime_type, row.filename) : null };
+    }),
   };
 }
 
@@ -190,13 +219,13 @@ export async function upsertBrandInfo(
 export async function getBrandLogo(
   scope: string,
   slot: number,
-): Promise<{ bytes: Buffer; mimeType: string } | null> {
-  const { rows } = await getPool().query<{ bytes: Buffer; mime_type: string }>(
-    "SELECT bytes, mime_type FROM portal_logos WHERE scope = $1 AND slot = $2",
+): Promise<{ bytes: Buffer; mimeType: string; filename: string | null } | null> {
+  const { rows } = await getPool().query<{ bytes: Buffer; mime_type: string; filename: string | null }>(
+    "SELECT bytes, mime_type, filename FROM portal_logos WHERE scope = $1 AND slot = $2",
     [scope, slot],
   );
   const row = rows[0];
-  return row ? { bytes: row.bytes, mimeType: row.mime_type } : null;
+  return row ? { bytes: row.bytes, mimeType: row.mime_type, filename: row.filename } : null;
 }
 
 export function hashLogoBytes(bytes: Buffer): string {
@@ -215,7 +244,7 @@ export async function hasLogoWithHash(scope: string, contentHash: string): Promi
 export async function upsertBrandLogo(
   scope: string,
   slot: number,
-  image: { bytes: Buffer; mimeType: string } | null,
+  image: { bytes: Buffer; mimeType: string; filename?: string | null } | null,
   updatedBy: string,
 ): Promise<void> {
   if (!image) {
@@ -224,14 +253,15 @@ export async function upsertBrandLogo(
   }
   const contentHash = hashLogoBytes(image.bytes);
   await getPool().query(
-    `INSERT INTO portal_logos (scope, slot, bytes, mime_type, content_hash, updated_at, updated_by)
-     VALUES ($1, $2, $3, $4, $5, now(), $6)
+    `INSERT INTO portal_logos (scope, slot, bytes, mime_type, filename, content_hash, updated_at, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, now(), $7)
      ON CONFLICT (scope, slot) DO UPDATE SET
        bytes = EXCLUDED.bytes,
        mime_type = EXCLUDED.mime_type,
+       filename = EXCLUDED.filename,
        content_hash = EXCLUDED.content_hash,
        updated_at = now(),
        updated_by = EXCLUDED.updated_by`,
-    [scope, slot, image.bytes, image.mimeType, contentHash, updatedBy],
+    [scope, slot, image.bytes, image.mimeType, image.filename ?? null, contentHash, updatedBy],
   );
 }

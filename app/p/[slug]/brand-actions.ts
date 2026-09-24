@@ -92,7 +92,7 @@ export async function updateBrandAll(formData: FormData): Promise<UpdateBrandAll
     const remove = formData.get(`removeLogo_${slot}`) === "on";
     if (file && file.size > 0) {
       const bytes = Buffer.from(await file.arrayBuffer());
-      await upsertBrandLogo(slug, slot, { bytes, mimeType: file.type }, updatedBy);
+      await upsertBrandLogo(slug, slot, { bytes, mimeType: file.type, filename: file.name }, updatedBy);
       logosAdded++;
     } else if (remove) {
       await upsertBrandLogo(slug, slot, null, updatedBy);
@@ -113,14 +113,14 @@ export async function updateBrandAll(formData: FormData): Promise<UpdateBrandAll
       const zipBytes = Buffer.from(await zipFile.arrayBuffer());
       const images = extractImagesFromZip(zipBytes);
       if (images.length === 0) {
-        zipError = "That .zip didn't have any usable images in it (png, jpg, gif, webp or svg).";
+        zipError = "That .zip didn't have any usable images in it (png, jpg, gif, webp, svg or eps).";
       } else {
         const current = await getBrandAssets(slug);
         const emptySlots = current.logoSlots.filter((s) => !s.hasImage).map((s) => s.slot);
-        for (const { bytes, mimeType } of images) {
+        for (const { bytes, mimeType, filename } of images) {
           const slot = emptySlots.shift();
           if (slot === undefined) break;
-          await upsertBrandLogo(slug, slot, { bytes, mimeType }, updatedBy);
+          await upsertBrandLogo(slug, slot, { bytes, mimeType, filename }, updatedBy);
           logosAdded++;
         }
       }
