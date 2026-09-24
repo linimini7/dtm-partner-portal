@@ -58,18 +58,28 @@ const IMAGE_MIME_TYPES = new Set([
 const ZIP_MIME_TYPES = new Set(["application/zip", "application/x-zip-compressed"]);
 
 /**
- * Vector formats design/print agencies default to for logos, which nothing
- * in this pipeline can rasterize (sharp handles pixels, not paths) — so
- * these can't be auto-ingested the way a PNG can. Deliberately narrow (not
- * every non-image attachment) so a partner emailing over a signed contract
- * PDF doesn't get mistaken for a logo drop. Matched by extension since
- * senders' mail clients often report .eps as generic
- * application/octet-stream rather than a real vector MIME type.
+ * .eps is a real, storable logo format now (see lib/brand-assets.ts's
+ * logoFormatLabel / LogoSlotsField's "No preview" tile) — raw bytes in, no
+ * rasterizing needed, so it's ingested the same as a PNG below rather than
+ * flagged here. Matched by extension, not MIME type: senders' mail clients
+ * often report .eps as generic application/octet-stream.
+ *
+ * .ai is still genuinely unsupported — nothing in this app can store or
+ * display an Illustrator file usefully yet. Deliberately narrow (not every
+ * non-image attachment) so a partner emailing over a signed contract PDF
+ * doesn't get mistaken for a logo drop.
  */
-const UNSUPPORTED_LOGO_EXTENSIONS = new Map([
-  [".eps", "EPS"],
-  [".ai", "Illustrator (.ai)"],
-]);
+const UNSUPPORTED_LOGO_EXTENSIONS = new Map([[".ai", "Illustrator (.ai)"]]);
+
+const VECTOR_LOGO_EXTENSIONS = new Map([[".eps", "application/postscript"]]);
+
+function vectorLogoMimeType(filename: string): string | null {
+  const lower = filename.toLowerCase();
+  for (const [ext, mimeType] of VECTOR_LOGO_EXTENSIONS) {
+    if (lower.endsWith(ext)) return mimeType;
+  }
+  return null;
+}
 
 function unsupportedLogoFormat(filename: string): string | null {
   const lower = filename.toLowerCase();
@@ -135,7 +145,7 @@ export async function ingestPartnerEmails(): Promise<IngestionResult> {
     const match = matchPartner(message, partners);
     if (!match) continue;
 
-    // ---- logos: drop any real (non-inline) image or .zip-of-images attachment into the next open slot ----
+    // ---- logos: drop any real (non-inline) image, .eps or .zip-of-images attachment into the next open slot ----
     // Excludes inline images — email-signature logos, headshots, tracking
     // pixels embedded in the body rather than deliberately attached.
     const allParts = flattenParts(message.payload.parts);
@@ -155,8 +165,12 @@ export async function ingestPartnerEmails(): Promise<IngestionResult> {
         p.body?.attachmentId &&
         isRealAttachment(p),
     );
+    // Matched by filename, not MIME type — see vectorLogoMimeType's comment.
+    const vectorParts = allParts.filter(
+      (p) => p.filename && p.body?.attachmentId && isRealAttachment(p) && vectorLogoMimeType(p.filename),
+    );
 
-    if (attachmentParts.length > 0 || zipParts.length > 0) {
+    if (attachmentParts.length > 0 || zipParts.length > 0 || vectorParts.length > 0) {
       const current = await getBrandAssets(match.slug);
       const emptySlots = current.logoSlots.filter((s) => !s.hasImage).map((s) => s.slot);
 
@@ -167,7 +181,7 @@ export async function ingestPartnerEmails(): Promise<IngestionResult> {
         if (await hasLogoWithHash(match!.slug, hashLogoBytes(bytes))) return;
         const slot = emptySlots.shift();
         if (slot === undefined) return;
-        await upsertBrandLogo(match!.slug, slot, { bytes, mimeType }, "email-ingestion");
+        await upsertBrandLogo(match!.slug, slot, { bytes, mimeType, filename }, "email-ingestion");
         logosAdded.push({ slug: match!.slug, filename });
         await logActivity(match!.slug, "email-ingestion", `Logo arrived by email (${filename})`);
       }
@@ -183,9 +197,14 @@ export async function ingestPartnerEmails(): Promise<IngestionResult> {
           await tryAddLogo(image.bytes, image.mimeType, `${part.filename} → ${image.filename}`);
         }
       }
+
+      for (const part of vectorParts) {
+        const bytes = await getAttachmentBytes(message.id, part.body!.attachmentId!);
+        await tryAddLogo(bytes, vectorLogoMimeType(part.filename!)!, part.filename!);
+      }
     }
 
-    // ---- unsupported vector logos (.eps, .ai): can't be ingested, but shouldn't vanish silently ----
+    // ---- unsupported vector logos (.ai): can't be ingested, but shouldn't vanish silently ----
     const unsupportedParts = allParts.filter(
       (p) => p.filename && p.body?.attachmentId && isRealAttachment(p) && unsupportedLogoFormat(p.filename),
     );
